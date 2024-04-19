@@ -1,0 +1,101 @@
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
+
+//project.archivesBaseName = moduleName
+
+println "============= publish -->> moduleName: " + project.name + " ============="
+println "============= publish -->> moduleVersion: " + project.name + " ============="
+
+javadoc {
+    failOnError = false
+}
+
+task packageJavadoc(type: Jar) {
+    archiveClassifier = 'javadoc'
+    from javadoc
+}
+
+task packageSources(type: Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId project.group
+            artifactId project.name
+            version project.version
+
+            artifact project.packageSources {
+                archiveClassifier = "sources"
+            }
+
+            artifact project.packageJavadoc {
+                archiveClassifier = "javadoc"
+            }
+
+            pom {
+                name = project.name
+                description = 'Aliyun Open Services SDK for Android\n' +
+                        '      Copyright (C) Alibaba Cloud Computing\n' +
+                        '      All rights reserved.\n' +
+                        '      版权所有 （C）阿里云计算有限公司\n' +
+                        '      http://www.aliyun.com'
+                url = 'https://github.com/aliyun/aliyun-log-android-sdk'
+
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = "aliyunproducts"
+                        name = "Aliyun Log develpment team"
+                        email = "aliyunsdk@aliyun.com"
+                    }
+                }
+
+                scm {
+                    url = 'https://github.com/aliyun/aliyun-log-android-sdk'
+                    connection = 'https://github.com/aliyun/aliyun-log-android-sdk'
+                    developerConnection = 'https://github.com/aliyun/aliyun-log-android-sdk'
+                }
+
+//                withXml {
+//                    def dependenciesNode = asNode().appendNode('dependencies')
+//                    project.configurations.all { configuration ->
+//                        def name = configuration.name
+//                        if (name != "implementation" && name != "compile" && name != "api") {
+//                            return
+//                        }
+//                        println(configuration)
+//                        configuration.dependencies.each {
+//                            println(it)
+//                            if (it.name == "unspecified" || it.version == 'unspecified') {
+//                                // 忽略无法识别的
+//                                return
+//                            }
+//                            def dependencyNode = dependenciesNode.appendNode('dependency')
+//                            dependencyNode.appendNode('groupId', it.group)
+//                            dependencyNode.appendNode('artifactId', it.name)
+//                            dependencyNode.appendNode('version', it.version)
+//                            if (name == "api" || name == "compile") {
+//                                dependencyNode.appendNode("scope", "compile")
+//                            } else { // implementation
+//                                dependencyNode.appendNode("scope", "runtime")
+//                            }
+//                        }
+//                    }
+//                }
+            }
+        }
+    }
+}
+
+signing {
+    sign publishing.publications
+}

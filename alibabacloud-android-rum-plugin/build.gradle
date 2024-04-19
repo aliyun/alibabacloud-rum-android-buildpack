@@ -1,0 +1,49 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+dependencies {
+    compileOnly fileTree(dir: 'libs', include: ['*.jar'])
+}
+
+//==== copy bonree gradle plugin sdk classes to build dir
+task copyBonreeClasses(type: Copy) {
+    // !!! attention: disk path should case sensitive !!!
+    from (
+            zipTree(file("libs/classrewriter-7.7.0.jar")),
+            zipTree(file("libs/openrum-7.7.0.jar"))
+    )
+
+    into 'build/classes/java/main'
+    include '**/*.class', '**/*.properties'
+}
+
+tasks.named("javadoc") {
+    mustRunAfter(copyBonreeClasses)
+}
+
+tasks.named("jar") {
+    dependsOn(copyBonreeClasses)
+}
+
+//==== gradle plugin
+apply plugin: 'java-gradle-plugin'
+
+gradlePlugin {
+    plugins {
+        rumPlugin {
+            id = 'com.alibabacloud.rum'
+            displayName = "${id}.gradle.plugin"
+            description = project.description ?: project.name
+            implementationClass = 'com.openrum.android.gradle.plugin.PluginImpl'
+        }
+    }
+}
+
+//==== maven publish scripts
+apply from: rootProject.file('gradle/scripts/maven-publish-java.gradle')

@@ -1,0 +1,90 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    repositories {
+        mavenLocal()
+        jcenter()
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "io.github.gradle-nexus:publish-plugin:1.1.0"
+    }
+}
+
+plugins {
+    id 'com.android.application' version '8.1.2' apply false
+    id 'com.android.library' version '8.1.2' apply false
+}
+
+apply plugin: 'io.github.gradle-nexus.publish-plugin'
+
+allprojects { project ->
+    apply plugin: 'maven-publish'
+
+    group = 'com.aliyun.openservices'
+    version = '0.0.1-dev.2'
+}
+
+HashMap getSonatypeUserAccount() {
+    HashMap accountMap = new HashMap()
+    def parsedSettingsXml
+    def settingsFile = "/home/admin/settings.xml"
+    def defaultSettingsFile = System.getProperty("user.home") + "/.m2/settings.xml"
+
+    println("============= getSonatypeUserAccount. settingsFile: ${settingsFile}, exists: ${file(settingsFile).exists()} ============= ")
+    println("============= getSonatypeUserAccount. defaultSettingsFile: ${defaultSettingsFile}, exists: ${file(defaultSettingsFile).exists()} ============= ")
+
+    if (file(settingsFile).exists() || file(defaultSettingsFile).exists()) {
+        if (file(settingsFile).exists()) {
+            println("============= getSonatypeUserAccount. settingsFile exists ============= ")
+            parsedSettingsXml = (new XmlParser()).parse(settingsFile);
+        } else if (file(defaultSettingsFile).exists()) {
+            println("============= getSonatypeUserAccount. defaultSettingsFile exists ============= ")
+            parsedSettingsXml = (new XmlParser()).parse(defaultSettingsFile);
+        }
+
+        //noinspection GroovyVariableNotAssigned
+        parsedSettingsXml.servers[0].server.each { server ->
+            if ("releases" == server.id.text()) {
+                accountMap.put("id", server.id.text())
+                accountMap.put("username", server.username.text())
+                accountMap.put("password", server.password.text())
+            }
+        }
+    } else {
+        accountMap.put("id", "releases")
+        accountMap.put("username", "admin")
+        accountMap.put("password", "screct")
+    }
+
+    println("============= getSonatypeUserAccount. username: ${accountMap.get("username")}, pswd: ${accountMap.get("password")} ============= ")
+
+    return accountMap
+
+}
+
+nexusPublishing {
+    repositories {
+        sonatype {
+            nexusUrl = uri("https://s01.oss.sonatype.org/service/local/") //注意地址
+            snapshotRepositoryUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots")
+            packageGroup = "com.aliyun.opensercie" //groupId，必填
+
+            def accountMap = getSonatypeUserAccount();
+            username = accountMap.get("username")
+            password = accountMap.get("password")
+        }
+    }
+
+//    useStaging.set(provider {
+//        project.nexusPublishing
+//        def release = publishing.publications.mavenPublication
+//        release.version.endsWith("-SNAPSHOT")
+
+
+//        val release: MavenPublication by publishing.publications
+//        release.version.endsWith("-SNAPSHOT")
+//    })
+}
