@@ -30,7 +30,7 @@ allprojects { project ->
     apply plugin: 'maven-publish'
 
     group = 'com.aliyun.openservices'
-    version = '0.0.1-dev.2'
+    version = '0.0.1-dev.1'
 }
 
 HashMap getSonatypeUserAccount() {
