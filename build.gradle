@@ -42,6 +42,17 @@ allprojects { project ->
     version = '0.0.1-dev.1'
 }
 
+// java library 没有assembleRelease task，这里定义一个，并代理assemble task
+task assembleRelease
+
+gradle.projectsEvaluated {
+    subprojects { subproject ->
+        if (subproject.tasks.findByPath('assemble') != null) {
+            assembleRelease.dependsOn subproject.tasks.assemble
+        }
+    }
+}
+
 HashMap getSonatypeUserAccount() {
     HashMap accountMap = new HashMap()
     def parsedSettingsXml
