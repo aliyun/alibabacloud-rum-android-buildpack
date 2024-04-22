@@ -22,7 +22,7 @@ publishing {
             artifactId project.name
             version project.version
 
-            artifact("$buildDir/outputs/aar/${moduleName}-debug.aar")
+            artifact("$buildDir/outputs/aar/${moduleName}-release.aar")
             artifact androidSourcesJar
 
             pom {

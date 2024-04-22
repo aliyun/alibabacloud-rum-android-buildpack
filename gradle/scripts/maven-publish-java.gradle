@@ -22,7 +22,10 @@ task packageSources(type: Jar) {
 
 publishing {
     publications {
-        mavenJava(MavenPublication) {
+        withType(MavenPublication).configureEach {
+//
+//        }
+//        mavenJava(MavenPublication) {
             groupId project.group
             artifactId project.name
             version project.version
