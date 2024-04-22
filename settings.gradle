@@ -4,6 +4,14 @@ pluginManagement {
         mavenLocal()
         mavenCentral()
         gradlePluginPortal()
+
+        // aliyun maven
+        // mirror of google()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        // mirror of central & jcenter
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        // mirror of gradlePluginPortal
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
     }
 }
 dependencyResolutionManagement {
@@ -13,6 +21,14 @@ dependencyResolutionManagement {
         mavenLocal()
         mavenCentral()
         gradlePluginPortal()
+
+        // aliyun maven
+        // mirror of google()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        // mirror of central & jcenter
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        // mirror of gradlePluginPortal
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
     }
 }
 
