@@ -34,5 +34,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "alibabacloud-rum-android-buildpack"
 //include ':app'
-include ':alibabacloud-android-rum-sdk'
+//include ':alibabacloud-android-rum-sdk'
 include ':alibabacloud-android-rum-plugin'

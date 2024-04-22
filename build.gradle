@@ -37,7 +37,8 @@ apply plugin: 'io.github.gradle-nexus.publish-plugin'
 allprojects { project ->
     apply plugin: 'maven-publish'
 
-    group = 'com.aliyun.rum'
+    group = 'com.alibabacloud.rum'
+//    group = 'io.github.aliyun-sls'
     version = '0.0.1-dev.1'
 }
 
@@ -84,7 +85,8 @@ nexusPublishing {
         sonatype {
             nexusUrl = uri("https://s01.oss.sonatype.org/service/local/") //注意地址
             snapshotRepositoryUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots")
-            packageGroup = "com.aliyun.rum" //groupId，必填
+            packageGroup = "com.alibabacloud.rum" //groupId，必填
+//            packageGroup = "io.github.aliyun-sls" //groupId，必填
 
             def accountMap = getSonatypeUserAccount();
             username = accountMap.get("username")
