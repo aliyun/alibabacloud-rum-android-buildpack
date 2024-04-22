@@ -100,8 +100,8 @@ nexusPublishing {
 //            packageGroup = "io.github.aliyun-sls" //groupId，必填
 
             def accountMap = getSonatypeUserAccount();
-            username = accountMap.get("username")
-            password = accountMap.get("password")
+//            username = accountMap.get("username")
+//            password = accountMap.get("password")
         }
     }
 
