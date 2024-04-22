@@ -1,6 +1,7 @@
 package com.aliyun.rum.android;
 
 import android.app.Application;
+import android.util.Log;
 import com.openrum.sdk.agent.OpenRum;
 
 /**
@@ -11,10 +12,15 @@ public class RumApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.e("RUMDEBUG", "onCreate start.");
 
+        final String appID = "********";
+        final String configAddress = "********";
         OpenRum
-            .withAppID("b590lhguqs@b314ff9fa1116f1")
-            .withConfigAddress("https://b590lhguqs-default-cn.rum.aliyuncs.com/RUM/config")
-            .withChannelID("cn-hangzhou");
+            .withAppID(appID)
+            .withConfigAddress(configAddress)
+            .start(getApplicationContext());
+
+        Log.e("RUMDEBUG", "onCreate end.");
     }
 }

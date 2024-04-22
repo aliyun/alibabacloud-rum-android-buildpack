@@ -1,15 +1,15 @@
 plugins {
     id 'com.android.application'
 }
-//apply plugin: "com.alibabacloud.rum"
+apply plugin: "com.alibabacloud.rum"
 
 android {
     namespace 'com.aliyun.rum.android'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.aliyun.rum.android"
-        minSdk 24
+        minSdk 21
         targetSdk 33
         versionCode 1
         versionName "1.0"
@@ -38,5 +38,5 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 
 //    implementation(project(":alibabacloud-android-rum-sdk"))
-//    implementation("com.aliyun.openservices:alibabacloud-android-rum-sdk:0.0.1-dev.1")
+    implementation("com.aliyun.openservices:alibabacloud-android-rum-sdk:0.0.1-dev.1")
 }
