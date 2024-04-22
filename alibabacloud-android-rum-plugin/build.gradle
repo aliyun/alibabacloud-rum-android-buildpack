@@ -37,7 +37,7 @@ apply plugin: 'java-gradle-plugin'
 gradlePlugin {
     plugins {
         rumPlugin {
-            id = 'com.alibabacloud.rum'
+            id = 'com.aliyun.rum'
 //            id = 'io.github.aliyun-sls'
             displayName = "${id}.gradle.plugin"
             description = project.description ?: project.name
