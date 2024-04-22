@@ -1,7 +1,7 @@
 plugins {
     id 'com.android.application'
 }
-apply plugin: "com.alibabacloud.rum"
+//apply plugin: "com.alibabacloud.rum"
 
 android {
     namespace 'com.aliyun.rum.android'
