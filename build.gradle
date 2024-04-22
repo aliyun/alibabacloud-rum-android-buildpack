@@ -48,7 +48,9 @@ task assembleRelease
 gradle.projectsEvaluated {
     subprojects { subproject ->
         if (subproject.tasks.findByPath('assemble') != null) {
-            assembleRelease.dependsOn subproject.tasks.assemble
+            if (subproject.plugins.hasPlugin('java-library')) {
+                assembleRelease.dependsOn subproject.tasks.assemble
+            }
         }
     }
 }
