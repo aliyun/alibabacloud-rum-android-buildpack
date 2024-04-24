@@ -2,7 +2,7 @@ package com.aliyun.rum.android;
 
 import android.app.Application;
 import android.util.Log;
-import com.openrum.sdk.agent.OpenRum;
+import com.alibabacloud.rum.AlibabaCloudRum;
 
 /**
  * @author yulong.gyl
@@ -16,7 +16,7 @@ public class RumApplication extends Application {
 
         final String appID = "********";
         final String configAddress = "********";
-        OpenRum
+        AlibabaCloudRum
             .withAppID(appID)
             .withConfigAddress(configAddress)
             .start(getApplicationContext());
