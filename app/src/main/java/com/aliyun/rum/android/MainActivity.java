@@ -2,7 +2,6 @@ package com.aliyun.rum.android;
 
 import android.app.Activity;
 import android.os.Bundle;
-import androidx.annotation.Nullable;
 
 /**
  * @author yulong.gyl
@@ -11,7 +10,7 @@ import androidx.annotation.Nullable;
 public class MainActivity extends Activity {
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
     }
 }
