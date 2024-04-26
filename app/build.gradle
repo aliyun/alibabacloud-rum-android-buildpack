@@ -5,11 +5,12 @@ apply plugin: "com.aliyun.rum"
 
 android {
     namespace 'com.aliyun.rum.android'
-    compileSdk 34
+    compileSdk 30
 
     defaultConfig {
         applicationId "com.aliyun.rum.android"
-        minSdk 21
+        minSdk 22
+        targetSdk 30
         versionCode 1
         versionName "1.0.0"
 
