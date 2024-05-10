@@ -55,4 +55,7 @@ public class AlibabaCloudRum {
         return this;
     }
 
+    public static void setUserName(String userID) {
+        OpenRum.setUserID(userID);
+    }
 }
