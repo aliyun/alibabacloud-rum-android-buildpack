@@ -58,4 +58,28 @@ public class AlibabaCloudRum {
     public static void setUserName(String userID) {
         OpenRum.setUserID(userID);
     }
+
+    public static void setCustomException(Throwable exception) {
+        OpenRum.setCustomException(exception);
+    }
+
+    public static void setCustomException(String type, String caseBy, String message) {
+        OpenRum.setCustomException(type, caseBy, message);
+    }
+
+    public static void setCustomMetric(String name, long value) {
+        OpenRum.setCustomMetric(name, value);
+    }
+
+    public static void setCustomMetric(String name, long value, String param) {
+        OpenRum.setCustomMetric(name, value, param);
+    }
+
+    public static void setCustomLog(String info) {
+        OpenRum.setCustomLog(info);
+    }
+
+    public static void setCustomLog(String info, String param) {
+        OpenRum.setCustomLog(info, param);
+    }
 }

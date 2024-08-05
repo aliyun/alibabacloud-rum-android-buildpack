@@ -42,7 +42,7 @@ allprojects { project ->
 
     group = 'com.aliyun.rum'
 //    group = 'io.github.aliyun-sls'
-    version = '0.3.0-dev.4'
+    version = '0.3.0-dev.5'
 //    version = '0.2.1-dev.3'
 }
 
