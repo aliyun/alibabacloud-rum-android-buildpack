@@ -1,5 +1,7 @@
 package com.alibabacloud.rum;
 
+import java.util.Map;
+
 import android.content.Context;
 import com.openrum.sdk.agent.OpenRum;
 
@@ -81,5 +83,21 @@ public class AlibabaCloudRum {
 
     public static void setCustomLog(String info, String param) {
         OpenRum.setCustomLog(info, param);
+    }
+
+    public static void setCustomEvent(String eventId, String eventName) {
+        OpenRum.setCustomEvent(eventId, eventName);
+    }
+
+    public static void setCustomEvent(String eventId, String eventName, String param) {
+        OpenRum.setCustomEvent(eventId, eventName, param);
+    }
+
+    public static void setCustomEvent(String eventId, String eventName, String param, Map<String, Object> info) {
+        OpenRum.setCustomEvent(eventId, eventName, param, info);
+    }
+
+    public static void setCustomEvent(String eventId, String eventName, Map<String, Object> info) {
+        OpenRum.setCustomEvent(eventId, eventName, info);
     }
 }
