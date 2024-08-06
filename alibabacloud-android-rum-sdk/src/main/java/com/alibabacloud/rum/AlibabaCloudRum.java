@@ -4,6 +4,7 @@ import java.util.Map;
 
 import android.content.Context;
 import com.openrum.sdk.agent.OpenRum;
+import com.openrum.sdk.agent.OpenRum.AppEnvironment;
 
 /**
  * @author yulong.gyl
@@ -11,6 +12,24 @@ import com.openrum.sdk.agent.OpenRum;
  * @noinspection unused
  */
 public class AlibabaCloudRum {
+    public enum Env {
+        NONE(0),
+        PROD(1),
+        GRAY(2),
+        PRE(3),
+        DAILY(4),
+        LOCAL(5);
+
+        private final int value;
+
+        private Env(int i) {
+            this.value = i;
+        }
+
+        public final int getValue() {
+            return this.value;
+        }
+    }
 
     private OpenRum openRum;
 
@@ -23,7 +42,38 @@ public class AlibabaCloudRum {
     }
 
     public static AlibabaCloudRum withAppID(String appID) {
-        SingletonHolder.INSTANCE.openRum = OpenRum.withAppID(appID);
+        SingletonHolder.INSTANCE.openRum = OpenRum.withAppID(appID).withAppEnvironment(AppEnvironment.PROD);
+        return SingletonHolder.INSTANCE;
+    }
+
+    public AlibabaCloudRum withEnvironment(Env env) {
+        switch (env) {
+            case NONE: {
+                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.NONE);
+                break;
+            }
+            case PROD: {
+                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.PROD);
+                break;
+            }
+            case GRAY: {
+                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.GRAY);
+                break;
+            }
+            case PRE: {
+                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.PRE);
+                break;
+            }
+            case DAILY: {
+                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.DAILY);
+                break;
+            }
+            case LOCAL: {
+                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.LOCAL);
+                break;
+            }
+        }
+
         return SingletonHolder.INSTANCE;
     }
 
