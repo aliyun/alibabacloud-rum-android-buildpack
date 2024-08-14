@@ -111,6 +111,10 @@ public class AlibabaCloudRum {
         OpenRum.setUserID(userID);
     }
 
+    public static void setExtraInfo(Map<String, Object> extraInfo) {
+        OpenRum.setExtraInfo(extraInfo);
+    }
+
     public static void setCustomException(Throwable exception) {
         OpenRum.setCustomException(exception);
     }
