@@ -129,7 +129,7 @@ public class AlibabaCloudRum {
         OpenRum.setUserID(userID);
     }
 
-    public static void setExtraInfo(Map<String, Object> extraInfo) {
+    public static void setUserExtraInfo(Map<String, Object> extraInfo) {
         //noinspection deprecation
         OpenRum.setExtraInfo(extraInfo);
     }
@@ -140,11 +140,11 @@ public class AlibabaCloudRum {
     }
     // endregion
 
-    // region ===== metric =====
     public static void setCustomException(String type, String caseBy, String message) {
         OpenRum.setCustomException(type, caseBy, message);
     }
 
+    // region ===== metric =====
     public static void setCustomMetric(String name, long value) {
         OpenRum.setCustomMetric(name, value);
     }
@@ -171,7 +171,7 @@ public class AlibabaCloudRum {
         Map<String, Object> attributes) {
         JSONObject params = new JSONObject();
 
-        putJSONOpt(params, "_ll", level);
+        putJSONOpt(params, "_ll", TextUtils.isEmpty(level) ? "INFO" : level);
         putJSONOpt(params, "_ln", name);
         putJSONOpt(params, "_lc", content);
         if (null != attributes && !attributes.isEmpty()) {
