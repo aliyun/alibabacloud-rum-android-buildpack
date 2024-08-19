@@ -1,10 +1,16 @@
 package com.alibabacloud.rum;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.UUID;
 
 import android.content.Context;
+import android.text.TextUtils;
 import com.openrum.sdk.agent.OpenRum;
 import com.openrum.sdk.agent.OpenRum.AppEnvironment;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * @author yulong.gyl
@@ -39,6 +45,18 @@ public class AlibabaCloudRum {
 
     private AlibabaCloudRum() {
 
+    }
+
+    private static void putJSONOpt(JSONObject object, String key, Object value) {
+        if (TextUtils.isEmpty(key) || null == value) {
+            return;
+        }
+
+        try {
+            object.putOpt(key, value);
+        } catch (JSONException e) {
+            // ignore
+        }
     }
 
     public static AlibabaCloudRum withAppID(String appID) {
@@ -112,13 +130,17 @@ public class AlibabaCloudRum {
     }
 
     public static void setExtraInfo(Map<String, Object> extraInfo) {
+        //noinspection deprecation
         OpenRum.setExtraInfo(extraInfo);
     }
 
+    // region ===== exception =====
     public static void setCustomException(Throwable exception) {
         OpenRum.setCustomException(exception);
     }
+    // endregion
 
+    // region ===== metric =====
     public static void setCustomException(String type, String caseBy, String message) {
         OpenRum.setCustomException(type, caseBy, message);
     }
@@ -130,28 +152,81 @@ public class AlibabaCloudRum {
     public static void setCustomMetric(String name, long value, String param) {
         OpenRum.setCustomMetric(name, value, param);
     }
+    // endregion
 
-    public static void setCustomLog(String info) {
-        OpenRum.setCustomLog(info);
+    // region ===== log =====
+    public static void setCustomLog(String content) {
+        setCustomLog(content, null);
     }
 
-    public static void setCustomLog(String info, String param) {
-        OpenRum.setCustomLog(info, param);
+    public static void setCustomLog(String content, String name) {
+        setCustomLog(content, name, null);
     }
 
-    public static void setCustomEvent(String eventId, String eventName) {
-        OpenRum.setCustomEvent(eventId, eventName);
+    public static void setCustomLog(String content, String name, String snapshots) {
+        setCustomLog(content, name, snapshots, "INFO", null);
     }
 
-    public static void setCustomEvent(String eventId, String eventName, String param) {
-        OpenRum.setCustomEvent(eventId, eventName, param);
+    public static void setCustomLog(String content, String name, String snapshots, String level,
+        Map<String, Object> attributes) {
+        JSONObject params = new JSONObject();
+
+        putJSONOpt(params, "_ll", level);
+        putJSONOpt(params, "_ln", name);
+        putJSONOpt(params, "_lc", content);
+        if (null != attributes && !attributes.isEmpty()) {
+            for (Entry<String, Object> entry : attributes.entrySet()) {
+                putJSONOpt(params, entry.getKey(), entry.getValue());
+            }
+        }
+
+        OpenRum.setCustomLog(params.toString(), snapshots);
+    }
+    // endregion
+
+    // region ===== event =====
+    public static void setCustomEvent(String eventName) {
+        setCustomEvent(eventName, null);
     }
 
-    public static void setCustomEvent(String eventId, String eventName, String param, Map<String, Object> info) {
-        OpenRum.setCustomEvent(eventId, eventName, param, info);
+    public static void setCustomEvent(String eventName, String group) {
+        setCustomEvent(eventName, group, (String)null);
     }
 
-    public static void setCustomEvent(String eventId, String eventName, Map<String, Object> info) {
-        OpenRum.setCustomEvent(eventId, eventName, info);
+    public static void setCustomEvent(String eventName, String group, String snapshots) {
+        setCustomEvent(eventName, group, snapshots, 0);
     }
+
+    public static void setCustomEvent(String eventName, String group, double value) {
+        setCustomEvent(eventName, group, null, value);
+    }
+
+    public static void setCustomEvent(String eventName, String group, Map<String, Object> attributes) {
+        setCustomEvent(eventName, group, null, attributes);
+    }
+
+    public static void setCustomEvent(String eventName, String group, String snapshots, double value) {
+        setCustomEvent(eventName, group, snapshots, value, null);
+    }
+
+    public static void setCustomEvent(String eventName, String group, String snapshots,
+        Map<String, Object> attributes) {
+        setCustomEvent(eventName, group, snapshots, 0, attributes);
+    }
+
+    public static void setCustomEvent(String eventName, String group, double value, Map<String, Object> info) {
+        setCustomEvent(eventName, group, null, value, info);
+    }
+
+    public static void setCustomEvent(String eventName, String group, String snapshots, double value,
+        Map<String, Object> attributes) {
+        if (null == attributes) {
+            attributes = new HashMap<>();
+        }
+
+        // store custom value into attributes with '_orcv' field
+        attributes.put("_orcv", value);
+        OpenRum.setCustomEventWithLabel(UUID.randomUUID().toString(), eventName, group, snapshots, attributes);
+    }
+    // endregion
 }
