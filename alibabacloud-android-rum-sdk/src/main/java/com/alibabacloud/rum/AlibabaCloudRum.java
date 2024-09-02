@@ -60,7 +60,7 @@ public class AlibabaCloudRum {
     }
 
     public static AlibabaCloudRum withAppID(String appID) {
-        SingletonHolder.INSTANCE.openRum = OpenRum.withAppID(appID);
+        SingletonHolder.INSTANCE.openRum = OpenRum.withAppID(appID).withAppEnvironment(AppEnvironment.PROD);
         return SingletonHolder.INSTANCE;
     }
 
