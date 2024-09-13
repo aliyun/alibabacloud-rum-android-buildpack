@@ -1,6 +1,8 @@
 package com.alibabacloud.rum;
 
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
@@ -18,6 +20,9 @@ import org.json.JSONObject;
  * @noinspection unused
  */
 public class AlibabaCloudRum {
+    private static final String CUSTOM_ATTRIBUTES_PREFIX = "_attr_";
+    private static final String SDK_VERSION_PREFIX = "_sv_";
+
     public enum Env {
         NONE(0),
         PROD(1),
@@ -38,6 +43,12 @@ public class AlibabaCloudRum {
     }
 
     private OpenRum openRum;
+
+    private final Map<String, Object> cachedExtraInfo = new LinkedHashMap<>();
+
+    {
+        cachedExtraInfo.put(SDK_VERSION_PREFIX, BuildConfig.RUM_SDK_VERSION);
+    }
 
     private static class SingletonHolder {
         private static final AlibabaCloudRum INSTANCE = new AlibabaCloudRum();
@@ -125,13 +136,84 @@ public class AlibabaCloudRum {
         return this;
     }
 
+    public void stop() {
+        OpenRum.stopSDK();
+    }
+
     public static void setUserName(String userID) {
         OpenRum.setUserID(userID);
     }
 
+    public static void setExtraInfo(Map<String, Object> extraInfo) {
+        internalSetExtraInfo(extraInfo, false, false);
+    }
+
+    public static void addExtraInfo(Map<String, Object> extraInfo) {
+        internalSetExtraInfo(extraInfo, false, true);
+    }
+
     public static void setUserExtraInfo(Map<String, Object> extraInfo) {
+        internalSetExtraInfo(extraInfo, true, false);
+    }
+
+    public static void addUserExtraInfo(Map<String, Object> extraInfo) {
+        internalSetExtraInfo(extraInfo, true, true);
+    }
+
+    private static void internalSetExtraInfo(Map<String, Object> extraInfo, boolean user, boolean append) {
+        if (null == extraInfo || extraInfo.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> cachedExtraInfo = SingletonHolder.INSTANCE.cachedExtraInfo;
+        //noinspection unchecked
+        Map<String, Object> global = (Map<String, Object>)cachedExtraInfo.get(CUSTOM_ATTRIBUTES_PREFIX);
+        if (null == global) {
+            global = new LinkedHashMap<>();
+        }
+
+        if (!append) {
+            Iterator<Entry<String, Object>> iterator = cachedExtraInfo.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Entry<String, Object> next = iterator.next();
+                if (null == next.getKey()) {
+                    continue;
+                }
+
+                // keep SDK_VERSION_PREFIX
+                if (SDK_VERSION_PREFIX.equals(next.getKey())) {
+                    continue;
+                }
+
+                if (user) {
+                    // in user attributes mode
+                    // remove kv if is not global attributes
+                    if (!next.getKey().equals(CUSTOM_ATTRIBUTES_PREFIX)) {
+                        iterator.remove();
+                    }
+                } else {
+                    // not in user attributes mode
+                    // remove kv if is global attributes
+                    if (next.getKey().equals(CUSTOM_ATTRIBUTES_PREFIX)) {
+                        global.clear();
+                        iterator.remove();
+                    }
+                }
+            }
+        }
+
+        if (user) {
+            cachedExtraInfo.putAll(extraInfo);
+        } else {
+            global.putAll(extraInfo);
+        }
+
+        if (!global.isEmpty()) {
+            cachedExtraInfo.put(CUSTOM_ATTRIBUTES_PREFIX, global);
+        }
+
         //noinspection deprecation
-        OpenRum.setExtraInfo(extraInfo);
+        OpenRum.setExtraInfo(cachedExtraInfo);
     }
 
     // region ===== exception =====
