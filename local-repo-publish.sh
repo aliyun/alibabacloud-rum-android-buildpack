@@ -24,9 +24,13 @@ mkdir -p "$REPO_DIR/$VERSION"
 echo "work dir: $WORKING_DIR"
 echo "libs dir: $LIBS_DIR"
 echo "repo dir: $REPO_DIR"
-echo "repo dir: $REPO_DIR"
 echo "plugin sdk prefix: $M2_REPO_PLUGIN_PREFIX"
 echo "sdk prefix: $M2_REPO_SDK_PREFIX"
+
+pushd "$WORKING_DIR"
+# create version readable txt file
+touch ver_${VERSION}_$(date "+%Y%m%d_%H%M").txt
+popd
 
 # create plugin repo
 pushd "$REPO_DIR"
@@ -51,7 +55,7 @@ popd
 
 # zip archive
 pushd "$WORKING_DIR"
-zip -r alibabacloud-rum-android-sdk.zip .
+zip -r AlibabaCloudRUM-Android-${VERSION}-$(date "+%Y%m%d_%H%M").zip .
 popd
 
 
