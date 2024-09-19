@@ -133,6 +133,8 @@ public class AlibabaCloudRum {
 
     public AlibabaCloudRum start(Context context) {
         openRum.start(context);
+        //noinspection deprecation
+        OpenRum.setExtraInfo(cachedExtraInfo);
         return this;
     }
 
