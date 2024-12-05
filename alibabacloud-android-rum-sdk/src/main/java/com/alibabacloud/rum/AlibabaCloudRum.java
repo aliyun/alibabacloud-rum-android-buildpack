@@ -22,6 +22,7 @@ import org.json.JSONObject;
 public class AlibabaCloudRum {
     private static final String CUSTOM_ATTRIBUTES_PREFIX = "_attr_";
     private static final String SDK_VERSION_PREFIX = "_sv_";
+    private static final String SDK_FRAMEWORK = "_frmk_";
 
     public enum Env {
         NONE(0),
@@ -42,7 +43,36 @@ public class AlibabaCloudRum {
         }
     }
 
+    public enum Framework {
+        FLUTTER(0),
+        REACT_NATIVE(1),
+        UNITY(2);
+
+        private final int value;
+
+        Framework(int value) {
+            this.value = value;
+        }
+
+        public final int getValue() {
+            return this.value;
+        }
+
+        public final String getDescription() {
+            switch (this) {
+                case FLUTTER:
+                    return "Flutter";
+                case REACT_NATIVE:
+                    return "ReactNative";
+                case UNITY:
+                    return "Unity";
+            }
+            return null;
+        }
+    }
+
     private OpenRum openRum;
+    private Framework framework = null;
 
     private final Map<String, Object> cachedExtraInfo = new LinkedHashMap<>();
 
@@ -54,7 +84,7 @@ public class AlibabaCloudRum {
         private static final AlibabaCloudRum INSTANCE = new AlibabaCloudRum();
     }
 
-    private AlibabaCloudRum() {
+    AlibabaCloudRum() {
 
     }
 
@@ -128,6 +158,15 @@ public class AlibabaCloudRum {
 
     public AlibabaCloudRum start() {
         openRum.start();
+        //noinspection deprecation
+        OpenRum.setExtraInfo(cachedExtraInfo);
+        return this;
+    }
+
+    public AlibabaCloudRum startSync() {
+        openRum.withSyncStart(true).start();
+        //noinspection deprecation
+        OpenRum.setExtraInfo(cachedExtraInfo);
         return this;
     }
 
@@ -162,6 +201,13 @@ public class AlibabaCloudRum {
         internalSetExtraInfo(extraInfo, true, true);
     }
 
+    public static void setAppFramework(Framework framework) {
+        SingletonHolder.INSTANCE.framework = framework;
+        if (null != framework) {
+            SingletonHolder.INSTANCE.cachedExtraInfo.put(SDK_FRAMEWORK, framework.getDescription());
+        }
+    }
+
     private static void internalSetExtraInfo(Map<String, Object> extraInfo, boolean user, boolean append) {
         if (null == extraInfo || extraInfo.isEmpty()) {
             return;
@@ -184,6 +230,11 @@ public class AlibabaCloudRum {
 
                 // keep SDK_VERSION_PREFIX
                 if (SDK_VERSION_PREFIX.equals(next.getKey())) {
+                    continue;
+                }
+
+                // keep SDK_FRAMEWORK
+                if (SDK_FRAMEWORK.equals(next.getKey())) {
                     continue;
                 }
 
@@ -222,11 +273,11 @@ public class AlibabaCloudRum {
     public static void setCustomException(Throwable exception) {
         OpenRum.setCustomException(exception);
     }
-    // endregion
 
     public static void setCustomException(String type, String caseBy, String message) {
         OpenRum.setCustomException(type, caseBy, message);
     }
+    // endregion
 
     // region ===== metric =====
     public static void setCustomMetric(String name, long value) {
