@@ -41,7 +41,7 @@ gradlePlugin {
 //            id = 'io.github.aliyun-sls'
             displayName = "${id}.gradle.plugin"
             description = project.description ?: project.name
-            implementationClass = 'com.openrum.android.gradle.plugin.PluginImpl'
+            implementationClass = 'com.openrum.PluginImpl'
         }
     }
 }
