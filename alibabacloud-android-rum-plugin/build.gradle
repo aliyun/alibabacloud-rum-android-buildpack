@@ -15,8 +15,8 @@ dependencies {
 task copyBonreeClasses(type: Copy) {
     // !!! attention: disk path should case sensitive !!!
     from (
-            zipTree(file("libs/classrewriter-8.15.0.jar")),
-            zipTree(file("libs/openrum-8.15.0.jar"))
+            zipTree(file("libs/classrewriter-8.18.1.jar")),
+            zipTree(file("libs/openrum-8.18.1.jar"))
     )
 
     into 'build/classes/java/main'
@@ -41,7 +41,7 @@ gradlePlugin {
 //            id = 'io.github.aliyun-sls'
             displayName = "${id}.gradle.plugin"
             description = project.description ?: project.name
-            implementationClass = 'com.openrum.android.gradle.plugin.PluginImpl'
+            implementationClass = 'com.rum.RumPlugin'
         }
     }
 }

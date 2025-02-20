@@ -10,7 +10,6 @@ import java.util.UUID;
 import android.content.Context;
 import android.text.TextUtils;
 import com.openrum.sdk.agent.OpenRum;
-import com.openrum.sdk.agent.OpenRum.AppEnvironment;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -32,6 +31,17 @@ public class AlibabaCloudRum {
         DAILY(4),
         LOCAL(5);
 
+        static Map<Integer, String> sEnvStringMap = new HashMap<Integer, String>() {
+            {
+                put(Env.NONE.getValue(), "none");
+                put(Env.PROD.getValue(), "prod");
+                put(Env.GRAY.getValue(), "gray");
+                put(Env.PRE.getValue(), "pre");
+                put(Env.DAILY.getValue(), "daily");
+                put(Env.LOCAL.getValue(), "local");
+            }
+        };
+
         private final int value;
 
         private Env(int i) {
@@ -40,6 +50,10 @@ public class AlibabaCloudRum {
 
         public final int getValue() {
             return this.value;
+        }
+
+        public final String stringValue() {
+            return sEnvStringMap.get(this.value);
         }
     }
 
@@ -73,6 +87,7 @@ public class AlibabaCloudRum {
 
     private OpenRum openRum;
     private Framework framework = null;
+    private String env = Env.PROD.stringValue();
 
     private final Map<String, Object> cachedExtraInfo = new LinkedHashMap<>();
 
@@ -101,38 +116,13 @@ public class AlibabaCloudRum {
     }
 
     public static AlibabaCloudRum withAppID(String appID) {
-        SingletonHolder.INSTANCE.openRum = OpenRum.withAppID(appID).withAppEnvironment(AppEnvironment.PROD);
+        SingletonHolder.INSTANCE.openRum = OpenRum.withAppID(appID);
         return SingletonHolder.INSTANCE;
     }
 
     public AlibabaCloudRum withEnvironment(Env env) {
-        switch (env) {
-            case NONE: {
-                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.NONE);
-                break;
-            }
-            case PROD: {
-                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.PROD);
-                break;
-            }
-            case GRAY: {
-                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.GRAY);
-                break;
-            }
-            case PRE: {
-                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.PRE);
-                break;
-            }
-            case DAILY: {
-                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.DAILY);
-                break;
-            }
-            case LOCAL: {
-                SingletonHolder.INSTANCE.openRum.withAppEnvironment(AppEnvironment.LOCAL);
-                break;
-            }
-        }
-
+        this.env = env.stringValue();
+        SingletonHolder.INSTANCE.openRum.withAppEnvironment(this.env);
         return SingletonHolder.INSTANCE;
     }
 
@@ -164,6 +154,9 @@ public class AlibabaCloudRum {
     }
 
     public AlibabaCloudRum startSync() {
+        if (TextUtils.isEmpty(SingletonHolder.INSTANCE.env)) {
+            SingletonHolder.INSTANCE.openRum.withAppEnvironment(Env.PROD.stringValue());
+        }
         openRum.withSyncStart(true).start();
         //noinspection deprecation
         OpenRum.setExtraInfo(cachedExtraInfo);
@@ -171,6 +164,9 @@ public class AlibabaCloudRum {
     }
 
     public AlibabaCloudRum start(Context context) {
+        if (TextUtils.isEmpty(SingletonHolder.INSTANCE.env)) {
+            SingletonHolder.INSTANCE.openRum.withAppEnvironment(Env.PROD.stringValue());
+        }
         openRum.start(context);
         //noinspection deprecation
         OpenRum.setExtraInfo(cachedExtraInfo);
