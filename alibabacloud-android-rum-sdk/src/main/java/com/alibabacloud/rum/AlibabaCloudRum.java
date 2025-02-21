@@ -122,7 +122,15 @@ public class AlibabaCloudRum {
 
     public AlibabaCloudRum withEnvironment(Env env) {
         this.env = env.stringValue();
-        SingletonHolder.INSTANCE.openRum.withAppEnvironment(this.env);
+        return SingletonHolder.INSTANCE;
+    }
+
+    public AlibabaCloudRum withCustomEnvironment(String env) {
+        if (TextUtils.isEmpty(env)) {
+            return SingletonHolder.INSTANCE;
+        }
+
+        this.env = env;
         return SingletonHolder.INSTANCE;
     }
 
@@ -154,9 +162,7 @@ public class AlibabaCloudRum {
     }
 
     public AlibabaCloudRum startSync() {
-        if (TextUtils.isEmpty(SingletonHolder.INSTANCE.env)) {
-            SingletonHolder.INSTANCE.openRum.withAppEnvironment(Env.PROD.stringValue());
-        }
+        openRum.withAppEnvironment(env);
         openRum.withSyncStart(true).start();
         //noinspection deprecation
         OpenRum.setExtraInfo(cachedExtraInfo);
@@ -164,9 +170,7 @@ public class AlibabaCloudRum {
     }
 
     public AlibabaCloudRum start(Context context) {
-        if (TextUtils.isEmpty(SingletonHolder.INSTANCE.env)) {
-            SingletonHolder.INSTANCE.openRum.withAppEnvironment(Env.PROD.stringValue());
-        }
+        openRum.withAppEnvironment(env);
         openRum.start(context);
         //noinspection deprecation
         OpenRum.setExtraInfo(cachedExtraInfo);
