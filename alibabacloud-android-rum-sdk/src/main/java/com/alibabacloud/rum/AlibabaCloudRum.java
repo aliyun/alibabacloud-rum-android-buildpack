@@ -364,4 +364,8 @@ public class AlibabaCloudRum {
         OpenRum.setCustomEventWithLabel(UUID.randomUUID().toString(), eventName, group, snapshots, attributes);
     }
     // endregion
+
+    public static String getDeviceId() {
+        return OpenRum.getDeviceID();
+    }
 }
