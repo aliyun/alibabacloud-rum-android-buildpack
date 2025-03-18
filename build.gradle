@@ -15,6 +15,7 @@ buildscript {
         maven { url 'https://maven.aliyun.com/repository/public' }
         // mirror of gradlePluginPortal
         maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        maven { url "https://plugins.gradle.org/m2/" }
     }
 
     dependencies {
@@ -103,7 +104,7 @@ nexusPublishing {
             packageGroup = "com.aliyun.rum" //groupId，必填
 //            packageGroup = "io.github.aliyun-sls" //groupId，必填
 
-            def accountMap = getSonatypeUserAccount();
+//            def accountMap = getSonatypeUserAccount();
 //            username = accountMap.get("username")
 //            password = accountMap.get("password")
         }
