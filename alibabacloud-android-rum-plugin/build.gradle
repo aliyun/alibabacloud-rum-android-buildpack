@@ -15,8 +15,8 @@ dependencies {
 task copyBonreeClasses(type: Copy) {
     // !!! attention: disk path should case sensitive !!!
     from (
-            zipTree(file("libs/classrewriter-8.18.1.jar")),
-            zipTree(file("libs/openrum-8.18.1.jar"))
+            zipTree(file("libs/classrewriter-8.20.0.jar")),
+            zipTree(file("libs/openrum-8.20.0.jar"))
     )
 
     into 'build/classes/java/main'
