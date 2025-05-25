@@ -9,7 +9,7 @@ import java.util.UUID;
 
 import android.content.Context;
 import android.text.TextUtils;
-import com.openrum.sdk.agent.OpenRum;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -85,9 +85,12 @@ public class AlibabaCloudRum {
         }
     }
 
-    private OpenRum openRum;
+    private final com.alibabacloud.rum.android.sdk.AlibabaCloudRum alibabaCloudRum
+            = new com.alibabacloud.rum.android.sdk.AlibabaCloudRum();
     private Framework framework = null;
     private String env = Env.PROD.stringValue();
+    private String endpoint = "";
+    private String appId = "";
 
     private final Map<String, Object> cachedExtraInfo = new LinkedHashMap<>();
 
@@ -116,7 +119,12 @@ public class AlibabaCloudRum {
     }
 
     public static AlibabaCloudRum withAppID(String appID) {
-        SingletonHolder.INSTANCE.openRum = OpenRum.withAppID(appID);
+//        SingletonHolder.INSTANCE.alibabaCloudRum = OpenRum.withAppID(appID);
+        if (TextUtils.isEmpty(appID)) {
+            return SingletonHolder.INSTANCE;
+        }
+
+        SingletonHolder.INSTANCE.appId = appID;
         return SingletonHolder.INSTANCE;
     }
 
@@ -134,55 +142,62 @@ public class AlibabaCloudRum {
         return SingletonHolder.INSTANCE;
     }
 
-    public AlibabaCloudRum withConfigAddress(String configAddress) {
-        openRum.withConfigAddress(configAddress);
-        return this;
+    // todo 新的sdk不需要设置config地址，只需要前置很简单的endpoint
+//    public AlibabaCloudRum withConfigAddress(String configAddress) {
+//        openRum.withConfigAddress(configAddress);
+//        return this;
+//    }
+    public AlibabaCloudRum withEndpointAddress(String endpointAddress) {
+        if (TextUtils.isEmpty(endpointAddress)) {
+            return SingletonHolder.INSTANCE;
+        }
+
+        this.endpoint = endpointAddress;
+        return SingletonHolder.INSTANCE;
     }
 
     public AlibabaCloudRum withAppVersion(String appVersion) {
-        openRum.withAppVersion(appVersion);
+        alibabaCloudRum.setAppVersion(appVersion);
+//        openRum.withAppVersion(appVersion);
         return this;
     }
 
     public AlibabaCloudRum withDeviceID(String deviceID) {
-        openRum.withDeviceID(deviceID);
+        alibabaCloudRum.setDeviceId(deviceID);
         return this;
     }
 
     public AlibabaCloudRum withChannelID(String channelID) {
-        openRum.withChannelID(channelID);
+        alibabaCloudRum.setAppChannel(channelID);
         return this;
     }
 
     public AlibabaCloudRum start() {
-        openRum.start();
-        //noinspection deprecation
-        OpenRum.setExtraInfo(cachedExtraInfo);
+        alibabaCloudRum.setExtraInfo(cachedExtraInfo);
+        com.alibabacloud.rum.android.sdk.AlibabaCloudRum.start(endpoint, appId);
         return this;
     }
 
     public AlibabaCloudRum startSync() {
-        openRum.withAppEnvironment(env);
-        openRum.withSyncStart(true).start();
-        //noinspection deprecation
-        OpenRum.setExtraInfo(cachedExtraInfo);
+        alibabaCloudRum.setExtraInfo(cachedExtraInfo);
+        alibabaCloudRum.setEnvironment(env);
+        com.alibabacloud.rum.android.sdk.AlibabaCloudRum.start(endpoint, appId);
         return this;
     }
 
     public AlibabaCloudRum start(Context context) {
-        openRum.withAppEnvironment(env);
-        openRum.start(context);
-        //noinspection deprecation
-        OpenRum.setExtraInfo(cachedExtraInfo);
+        alibabaCloudRum.setExtraInfo(cachedExtraInfo);
+        alibabaCloudRum.setEnvironment(env);
+        com.alibabacloud.rum.android.sdk.AlibabaCloudRum.start(context, endpoint, appId);
         return this;
     }
 
     public void stop() {
-        OpenRum.stopSDK();
+        alibabaCloudRum.stop();
     }
 
     public static void setUserName(String userID) {
-        OpenRum.setUserID(userID);
+        SingletonHolder.INSTANCE.alibabaCloudRum.setUserName(userID);
     }
 
     public static void setExtraInfo(Map<String, Object> extraInfo) {
@@ -266,26 +281,26 @@ public class AlibabaCloudRum {
         }
 
         //noinspection deprecation
-        OpenRum.setExtraInfo(cachedExtraInfo);
+        SingletonHolder.INSTANCE.alibabaCloudRum.setExtraInfo(cachedExtraInfo);
     }
 
     // region ===== exception =====
     public static void setCustomException(Throwable exception) {
-        OpenRum.setCustomException(exception);
+        com.alibabacloud.rum.android.sdk.AlibabaCloudRum.setCustomException(exception);
     }
 
     public static void setCustomException(String type, String caseBy, String message) {
-        OpenRum.setCustomException(type, caseBy, message);
+        com.alibabacloud.rum.android.sdk.AlibabaCloudRum.setCustomException(caseBy, message);
     }
     // endregion
 
     // region ===== metric =====
     public static void setCustomMetric(String name, long value) {
-        OpenRum.setCustomMetric(name, value);
+        // todo do nothing
     }
 
     public static void setCustomMetric(String name, long value, String param) {
-        OpenRum.setCustomMetric(name, value, param);
+        // todo do nothing
     }
     // endregion
 
@@ -315,7 +330,7 @@ public class AlibabaCloudRum {
             }
         }
 
-        OpenRum.setCustomLog(params.toString(), snapshots);
+        com.alibabacloud.rum.android.sdk.AlibabaCloudRum.setCustomLog(content, name, level, snapshots, attributes);
     }
     // endregion
 
@@ -361,11 +376,12 @@ public class AlibabaCloudRum {
 
         // store custom value into attributes with '_orcv' field
         attributes.put("_orcv", value);
-        OpenRum.setCustomEventWithLabel(UUID.randomUUID().toString(), eventName, group, snapshots, attributes);
+//        OpenRum.setCustomEventWithLabel(UUID.randomUUID().toString(), eventName, group, snapshots, attributes);
+        com.alibabacloud.rum.android.sdk.AlibabaCloudRum.setCustomEvent(eventName, String.valueOf(value), group, snapshots, attributes);
     }
     // endregion
 
     public static String getDeviceId() {
-        return OpenRum.getDeviceID();
+        return com.alibabacloud.rum.android.sdk.AlibabaCloudRum.getDeviceId();
     }
 }

@@ -6,18 +6,17 @@ package com.alibabacloud.rum;
  */
 public class AlibabaCloudRumBridge extends AlibabaCloudRum {
     private static AlibabaCloudRum rum = null;
-
     public static void setAppId(String appId) {
         rum = AlibabaCloudRum.withAppID(appId);
     }
 
-    public static void setConfigAddress(String configAddress) {
-        if (null == rum) {
-            return;
-        }
-
-        rum.withConfigAddress(configAddress);
-    }
+//    public static void setConfigAddress(String configAddress) {
+//        if (null == rum) {
+//            return;
+//        }
+//
+//        rum.withConfigAddress(configAddress);
+//    }
 
     public static void setAppVersion(String appVersion) {
         if (null == rum) {
@@ -38,6 +37,7 @@ public class AlibabaCloudRumBridge extends AlibabaCloudRum {
             return;
         }
         rum.withDeviceID(deviceID);
+
     }
 
     public static void setEnvironment(Env env) {
