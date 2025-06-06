@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.library'
+    id 'com.kezong.fat-aar'
 }
 
 android {
@@ -30,7 +31,8 @@ android {
 }
 
 dependencies {
-    api fileTree(dir: 'libs', include: ['*.jar'])
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    embed project(':alibabacloud-rum-android-sdk')
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
