@@ -34,6 +34,13 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     embed project(':alibabacloud-rum-android-sdk')
 
+    implementation(platform("io.opentelemetry:opentelemetry-bom:1.49.0"))
+    implementation("io.opentelemetry:opentelemetry-api")
+    implementation('io.opentelemetry:opentelemetry-sdk')
+    implementation('io.opentelemetry:opentelemetry-exporter-otlp-common')
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
+    implementation('io.opentelemetry.contrib:opentelemetry-disk-buffering:1.45.0-alpha')
+
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
