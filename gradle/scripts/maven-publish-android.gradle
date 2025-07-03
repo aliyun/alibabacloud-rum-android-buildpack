@@ -50,9 +50,9 @@ publishing {
                 }
 
                 scm {
-                    url = 'https://github.com/aliyun/aliyun-log-android-sdk'
-                    connection = 'https://github.com/aliyun/aliyun-log-android-sdk'
-                    developerConnection = 'https://github.com/aliyun/aliyun-log-android-sdk'
+                    url = 'https://github.com/aliyun/alibabacloud-rum-android-buildpack'
+                    connection = 'https://github.com/aliyun/alibabacloud-rum-android-buildpack'
+                    developerConnection = 'https://github.com/aliyun/alibabacloud-rum-android-buildpack'
                 }
 
                 withXml {
