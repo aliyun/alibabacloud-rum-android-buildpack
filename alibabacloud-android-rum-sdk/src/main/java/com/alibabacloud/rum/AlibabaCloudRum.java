@@ -271,4 +271,8 @@ public class AlibabaCloudRum {
     public static String getDeviceId() {
         return Agent.getDeviceId();
     }
+
+    public static void setDebuggable(boolean debuggable) {
+        Agent.setDebuggable(debuggable);
+    }
 }
