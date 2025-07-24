@@ -15,7 +15,7 @@ dependencies {
 task copyBonreeClasses(type: Copy) {
     // !!! attention: disk path should case sensitive !!!
     from (
-            zipTree(file("libs/alibabacloud-rum-android-plugin-0.0.1.jar"))
+            zipTree(file("libs/alibabacloud-rum-android-plugin.jar"))
     )
 
     into 'build/classes/java/main'
