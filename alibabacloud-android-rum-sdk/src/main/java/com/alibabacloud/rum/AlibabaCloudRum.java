@@ -103,6 +103,11 @@ public class AlibabaCloudRum {
         return SingletonHolder.INSTANCE;
     }
 
+    public AlibabaCloudRum withWorkspace(String workspace) {
+        Agent.setWorkspace(workspace);
+        return SingletonHolder.INSTANCE;
+    }
+
     /**
      * @noinspection UnusedReturnValue
      */
