@@ -48,7 +48,6 @@ popd
 pushd "$LIBS_DIR"
 unzip -o "$M2_REPO_SDK_PREFIX.aar" -d out
 cp "out/classes.jar" "alibabacloud-android-rum-sdk.jar"
-cp "out/libs/com.openrum.sdk.jar" "com.openrum.sdk.jar"
 cp -r "out/jni/"* .
 rm -rf out
 popd
