@@ -15,8 +15,7 @@ dependencies {
 task copyBonreeClasses(type: Copy) {
     // !!! attention: disk path should case sensitive !!!
     from (
-            zipTree(file("libs/classrewriter-8.20.0.jar")),
-            zipTree(file("libs/openrum-8.20.0.jar"))
+            zipTree(file("libs/alibabacloud-rum-android-plugin.jar"))
     )
 
     into 'build/classes/java/main'
@@ -41,7 +40,8 @@ gradlePlugin {
 //            id = 'io.github.aliyun-sls'
             displayName = "${id}.gradle.plugin"
             description = project.description ?: project.name
-            implementationClass = 'com.rum.RumPlugin'
+//            implementationClass = 'com.rum.RumPlugin'
+            implementationClass = 'com.alibabacloud.rum.android.plugin.AlibabacloudRumPlugin'
         }
     }
 }
