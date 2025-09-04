@@ -44,7 +44,7 @@ allprojects { project ->
     apply plugin: 'maven-publish'
 
     group = 'com.aliyun.rum'
-    version = '1.0.4'
+    version = '1.0.5-beta.1'
 }
 
 // java library 没有assembleRelease task，这里定义一个，并代理assemble task
