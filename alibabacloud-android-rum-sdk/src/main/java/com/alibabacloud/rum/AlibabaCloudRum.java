@@ -123,6 +123,7 @@ public class AlibabaCloudRum {
     /** @noinspection UnusedReturnValue*/
     public AlibabaCloudRum withEnvironment(Env env) {
         this.env = env.stringValue();
+        Agent.setEnvironment(this.env);
         return SingletonHolder.INSTANCE;
     }
 
