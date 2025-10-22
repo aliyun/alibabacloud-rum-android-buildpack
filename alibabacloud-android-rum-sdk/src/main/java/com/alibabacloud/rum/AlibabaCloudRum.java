@@ -139,32 +139,32 @@ public class AlibabaCloudRum {
 
     public AlibabaCloudRum withAppVersion(String appVersion) {
         Agent.setAppVersion(appVersion);
-        return this;
+        return SingletonHolder.INSTANCE;
     }
 
     public AlibabaCloudRum withDeviceID(String deviceID) {
         Agent.setDeviceId(deviceID);
-        return this;
+        return SingletonHolder.INSTANCE;
     }
 
     public AlibabaCloudRum withChannelID(String channelID) {
         Agent.setAppChannel(channelID);
-        return this;
+        return SingletonHolder.INSTANCE;
     }
 
     public AlibabaCloudRum start() {
         Agent.start(endpoint, appId);
-        return this;
+        return SingletonHolder.INSTANCE;
     }
 
     public AlibabaCloudRum startSync() {
         Agent.start(endpoint, appId);
-        return this;
+        return SingletonHolder.INSTANCE;
     }
 
     public AlibabaCloudRum start(Context context) {
         Agent.start(context, endpoint, appId);
-        return this;
+        return SingletonHolder.INSTANCE;
     }
 
     public static void stop() {
