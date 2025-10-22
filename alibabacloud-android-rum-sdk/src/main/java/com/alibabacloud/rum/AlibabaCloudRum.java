@@ -163,11 +163,11 @@ public class AlibabaCloudRum {
     }
 
     public AlibabaCloudRum start(Context context) {
-        com.alibabacloud.rum.android.sdk.AlibabaCloudRum.start(context, endpoint, appId);
+        Agent.start(context, endpoint, appId);
         return this;
     }
 
-    public void stop() {
+    public static void stop() {
         Agent.stop();
     }
 
