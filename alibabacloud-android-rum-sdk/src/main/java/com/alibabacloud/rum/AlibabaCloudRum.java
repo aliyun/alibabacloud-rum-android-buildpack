@@ -108,15 +108,8 @@ public class AlibabaCloudRum {
         return SingletonHolder.INSTANCE;
     }
 
-    /**
-     * @noinspection UnusedReturnValue
-     */
-    public static AlibabaCloudRum withAppID(String appID) {
-        if (TextUtils.isEmpty(appID)) {
-            return SingletonHolder.INSTANCE;
-        }
-
-        SingletonHolder.INSTANCE.appId = appID;
+    public static AlibabaCloudRum withServiceId(String serviceId) {
+        Agent.setServiceId(serviceId);
         return SingletonHolder.INSTANCE;
     }
 

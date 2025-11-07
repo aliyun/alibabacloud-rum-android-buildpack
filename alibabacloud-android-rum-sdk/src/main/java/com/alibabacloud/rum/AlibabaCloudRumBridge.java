@@ -6,9 +6,6 @@ package com.alibabacloud.rum;
  */
 public class AlibabaCloudRumBridge extends AlibabaCloudRum {
     private static AlibabaCloudRum rum = null;
-    public static void setAppId(String appId) {
-        rum = AlibabaCloudRum.withAppID(appId);
-    }
 
 //    public static void setConfigAddress(String configAddress) {
 //        if (null == rum) {
