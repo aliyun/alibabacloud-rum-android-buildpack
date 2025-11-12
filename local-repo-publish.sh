@@ -49,6 +49,11 @@ pushd "$LIBS_DIR"
 unzip -o "$M2_REPO_SDK_PREFIX.aar" -d out
 cp "out/classes.jar" "alibabacloud-android-rum-sdk.jar"
 cp -r "out/jni/"* .
+# 检查 assets 目录是否存在，如果存在则拷贝
+if [ -d "out/assets" ]; then
+  echo "Copying assets directory..."
+  cp -r "out/assets" .
+fi
 rm -rf out
 popd
 
