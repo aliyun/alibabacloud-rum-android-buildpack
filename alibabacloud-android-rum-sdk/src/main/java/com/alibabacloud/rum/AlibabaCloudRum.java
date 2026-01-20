@@ -280,7 +280,7 @@ public class AlibabaCloudRum {
 
     public static void reportCustomResource(String type, String url, String method, int statusCode, String errorMessage, boolean success, String provider, TraceContext traceContext, Measuring measuring) {
         if (measuring == null) {
-            measuring = new Measuring(0, 0, 0, 0, 0, 0, 0, 0);
+            measuring = new Measuring();
         }
         Agent.reportCustomResource(type, url, method, statusCode, errorMessage, success, provider, traceContext, measuring);
     }
