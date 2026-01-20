@@ -6,6 +6,9 @@ import java.util.Map;
 import android.content.Context;
 import android.text.TextUtils;
 
+import com.alibabacloud.rum.capture.resource.customResource.Measuring;
+import com.alibabacloud.rum.capture.resource.customTrace.TraceContext;
+
 /**
  * @author yulong.gyl
  * @date 2024/4/19
@@ -273,5 +276,12 @@ public class AlibabaCloudRum {
 
     public static void setDebuggable(boolean debuggable) {
         Agent.setDebuggable(debuggable);
+    }
+
+    public static void reportCustomResource(String type, String url, String method, int statusCode, String errorMessage, boolean success, String provider, TraceContext traceContext, Measuring measuring) {
+        if (measuring == null) {
+            measuring = new Measuring(0, 0, 0, 0, 0, 0, 0, 0);
+        }
+        Agent.reportCustomResource(type, url, method, statusCode, errorMessage, success, provider, traceContext, measuring);
     }
 }
