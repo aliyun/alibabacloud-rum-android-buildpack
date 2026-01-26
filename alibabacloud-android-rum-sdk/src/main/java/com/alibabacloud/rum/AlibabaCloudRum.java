@@ -8,6 +8,7 @@ import android.text.TextUtils;
 
 import com.alibabacloud.rum.capture.resource.customResource.Measuring;
 import com.alibabacloud.rum.capture.resource.customTrace.TraceContext;
+import com.alibabacloud.rum.core.ResourceSnapshotProvider;
 
 /**
  * @author yulong.gyl
@@ -283,5 +284,17 @@ public class AlibabaCloudRum {
             measuring = new Measuring();
         }
         Agent.reportCustomResource(type, url, method, statusCode, errorMessage, success, provider, traceContext, measuring);
+    }
+
+    public static void setOkHttp2ResourceSnapshotProvider(ResourceSnapshotProvider provider) {
+        Agent.setOkHttp2ResourceSnapshotProvider(provider);
+    }
+
+    public static void setOkHttp3ResourceSnapshotProvider(ResourceSnapshotProvider provider) {
+        Agent.setOkHttp3ResourceSnapshotProvider(provider);
+    }
+
+    public static void setHttpUrlConnectionResourceSnapshotProvider(ResourceSnapshotProvider provider) {
+        Agent.setHttpUrlConnectionResourceSnapshotProvider(provider);
     }
 }
