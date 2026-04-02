@@ -153,7 +153,10 @@ public class AlibabaCloudRum {
         Agent.start(endpoint, appId);
         return SingletonHolder.INSTANCE;
     }
-
+    public AlibabaCloudRum start(boolean asyncMode) {
+        Agent.start(endpoint, appId, asyncMode);
+        return SingletonHolder.INSTANCE;
+    }
     public AlibabaCloudRum startSync() {
         Agent.start(endpoint, appId);
         return SingletonHolder.INSTANCE;
@@ -161,6 +164,11 @@ public class AlibabaCloudRum {
 
     public AlibabaCloudRum start(Context context) {
         Agent.start(context, endpoint, appId);
+        return SingletonHolder.INSTANCE;
+    }
+
+    public AlibabaCloudRum start(Context context, boolean asyncMode) {
+        Agent.start(context, endpoint, appId, asyncMode);
         return SingletonHolder.INSTANCE;
     }
 
