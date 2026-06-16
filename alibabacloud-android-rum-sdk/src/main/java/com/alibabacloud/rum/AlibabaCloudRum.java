@@ -206,6 +206,10 @@ public class AlibabaCloudRum {
     public static void setCustomException(String type, String caseBy, String message) {
         Agent.setCustomException(type, caseBy, message);
     }
+
+    public static String getSessionId() {
+        return Agent.getSessionId();
+    }
     // endregion
 
     // region ===== metric =====
