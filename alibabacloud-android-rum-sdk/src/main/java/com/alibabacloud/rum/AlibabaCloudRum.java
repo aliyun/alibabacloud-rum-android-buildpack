@@ -210,6 +210,9 @@ public class AlibabaCloudRum {
     public static String getSessionId() {
         return Agent.getSessionId();
     }
+    public static String getLastTraceId() {
+        return Agent.getLastTraceId();
+    }
     // endregion
 
     // region ===== metric =====
