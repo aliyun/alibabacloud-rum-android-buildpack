@@ -292,6 +292,15 @@ public class AlibabaCloudRum {
         Agent.setDebuggable(debuggable);
     }
 
+    /**
+     * 开启/关闭 SDK 自监控。
+     *
+     * <p>默认开启。关闭后仅影响 SDK 自监控的 /rum/monitor 上报，不影响业务 RUM 数据采集。</p>
+     */
+    public static void setSelfMonitor(boolean enabled) {
+        Agent.setSelfMonitor(enabled);
+    }
+
     public static void reportCustomResource(String type, String url, String method, int statusCode, String errorMessage, boolean success, String provider, TraceContext traceContext, Measuring measuring) {
         if (measuring == null) {
             measuring = new Measuring();
