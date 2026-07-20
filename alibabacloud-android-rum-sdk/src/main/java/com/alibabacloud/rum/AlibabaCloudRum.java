@@ -8,7 +8,6 @@ import android.text.TextUtils;
 
 import com.alibabacloud.rum.capture.resource.customResource.Measuring;
 import com.alibabacloud.rum.capture.resource.customTrace.TraceContext;
-import com.alibabacloud.rum.capture.sessionreplay.privacy.SessionReplayConfiguration;
 import com.alibabacloud.rum.core.ResourceSnapshotProvider;
 
 /**
@@ -173,29 +172,6 @@ public class AlibabaCloudRum {
     }
     public static void stop() {
         Agent.stop();
-    }
-
-    /**
-     * Starts Session Replay recording with the default configuration.
-     */
-    public static void startSessionReplay() {
-        Agent.startSessionReplay();
-    }
-
-    /**
-     * Starts Session Replay recording with the specified configuration.
-     *
-     * @param config Session Replay configuration
-     */
-    public static void startSessionReplay(SessionReplayConfiguration config) {
-        Agent.startSessionReplay(config);
-    }
-
-    /**
-     * Stops Session Replay recording and releases its resources.
-     */
-    public static void stopSessionReplay() {
-        Agent.stopSessionReplay();
     }
 
     public static void setUserName(String userID) {
