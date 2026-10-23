@@ -1,0 +1,9 @@
+# Public event API is shared by Java/Kotlin callers and the embedded SDK bridge.
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
+-keep public class com.alibabacloud.rum.event.RumEvent { public *; }
+-keep public class com.alibabacloud.rum.event.CustomEvent { public *; }
+-keep public class com.alibabacloud.rum.event.EventContext { public *; }
+-keep public interface com.alibabacloud.rum.event.EventInterceptor { public *; }
+-keepclassmembers class com.alibabacloud.rum.AlibabaCloudRum {
+    public static boolean setEventInterceptor(com.alibabacloud.rum.event.EventInterceptor);
+}

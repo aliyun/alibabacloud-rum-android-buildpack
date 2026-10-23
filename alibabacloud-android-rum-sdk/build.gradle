@@ -33,10 +33,26 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     embed project(':alibabacloud-rum-android-sdk')
+    compileOnly 'androidx.annotation:annotation:1.5.0'
 
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.14.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+
+// fat-aar 1.3.8 copies embedded classes into javac output after AGP records its incremental inputs.
+// A changed AAR can otherwise leave new classes out of TransformR and the final runtime/release JAR.
+// A value input forces a complete transform only when the embedded binary content changes.
+def embeddedSdkAar = rootProject.file(
+    'alibabacloud-rum-android-sdk/alibabacloud-rum-android-sdk-distribute.aar')
+def embeddedSdkDigest = providers.provider {
+    java.security.MessageDigest.getInstance('SHA-256').digest(embeddedSdkAar.bytes).encodeHex().toString()
+}
+tasks.configureEach { task ->
+    if (task.name.startsWith('transformClassesWithTransformRFor')) {
+        task.inputs.property('embeddedSdkSha256', embeddedSdkDigest)
+    }
 }
 
 apply from: rootProject.file('gradle/scripts/maven-publish-android.gradle')
