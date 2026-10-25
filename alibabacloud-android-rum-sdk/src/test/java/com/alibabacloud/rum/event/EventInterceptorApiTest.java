@@ -129,18 +129,31 @@ public class EventInterceptorApiTest {
 
     @Test
     public void publicEventSurfaceHasNoConstructionOrGenericMutation() {
-        for (Class<?> type : new Class<?>[] {RumEvent.class, CustomEvent.class, EventContext.class}) {
+        Class<?>[] eventTypes = {RumEvent.class, CustomEvent.class, ResourceEvent.class, EventContext.class};
+        for (Class<?> type : eventTypes) {
             for (Constructor<?> constructor : type.getDeclaredConstructors()) {
                 assertFalse(Modifier.isPublic(constructor.getModifiers()));
                 assertFalse(Modifier.isProtected(constructor.getModifiers()));
             }
         }
         assertTrue(Modifier.isFinal(CustomEvent.class.getModifiers()));
+        assertTrue(Modifier.isFinal(ResourceEvent.class.getModifiers()));
         assertThrows(NoSuchMethodException.class,
                 () -> RumEvent.class.getMethod("setAttribute", String.class, Object.class));
         assertThrows(NoSuchMethodException.class,
                 () -> RumEvent.class.getMethod("removeAttribute", String.class));
         assertThrows(NoSuchMethodException.class, () -> CustomEvent.class.getMethod("clone"));
+        assertThrows(NoSuchMethodException.class, () -> ResourceEvent.class.getMethod("clone"));
+        assertThrows(NoSuchMethodException.class,
+                () -> ResourceEvent.class.getMethod("setStatusCode", long.class));
+        assertThrows(NoSuchMethodException.class,
+                () -> ResourceEvent.class.getMethod("setSuccess", ResourceSuccess.class));
+        assertThrows(NoSuchMethodException.class,
+                () -> ResourceEvent.class.getMethod("setUrl", String.class));
+        assertThrows(NoSuchMethodException.class,
+                () -> RumEvent.class.getMethod("setResourceResult", long.class, ResourceSuccess.class));
+        assertThrows(NoSuchMethodException.class,
+                () -> CustomEvent.class.getMethod("setResourceResult", long.class, ResourceSuccess.class));
     }
 
     private Map<String, Object> customAttributes() {

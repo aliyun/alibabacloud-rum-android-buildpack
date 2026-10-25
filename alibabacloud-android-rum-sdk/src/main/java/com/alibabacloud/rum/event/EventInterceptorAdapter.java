@@ -18,7 +18,14 @@ public final class EventInterceptorAdapter {
                 return EventInterceptorRegistry.setEventInterceptor(null);
             }
             return EventInterceptorRegistry.setEventInterceptor((candidate, context) -> {
-                CustomEvent event = new CustomEvent(candidate);
+                RumEvent event;
+                if ("custom".equals(candidate.getEventType())) {
+                    event = new CustomEvent(candidate);
+                } else if ("resource".equals(candidate.getEventType())) {
+                    event = new ResourceEvent(candidate);
+                } else {
+                    return EventInterceptorRegistry.invalidCandidate();
+                }
                 RumEvent result = interceptor.intercept(event, new EventContext(context));
                 if (result == null) {
                     return null;

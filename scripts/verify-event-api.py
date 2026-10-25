@@ -88,6 +88,19 @@ final class JavaConsumer {
                 boolean changed = custom.setName("") && custom.setGroup(" ") && custom.setSnapshots("plain text");
                 if (!changed) return null;
             }
+            if (event instanceof ResourceEvent) {
+                ResourceEvent resource = (ResourceEvent) event;
+                String name = resource.getName(), message = resource.getMessage(), snapshots = resource.getSnapshots();
+                Long statusCode = resource.getStatusCode();
+                Integer success = resource.getSuccess();
+                boolean changed = resource.setName("") && resource.setMessage(" ")
+                    && resource.setSnapshots("plain text")
+                    && resource.setResourceResult(Long.MIN_VALUE, ResourceSuccess.UNKNOWN)
+                    && resource.setResourceResult(Long.MAX_VALUE, ResourceSuccess.SUCCESS)
+                    && resource.setResourceResult(1001L, ResourceSuccess.FAILED);
+                int unknown = ResourceSuccess.UNKNOWN.getValue();
+                if (!changed) return null;
+            }
             return event;
         });
         return registered && AlibabaCloudRum.setEventInterceptor(null);
@@ -97,6 +110,8 @@ final class JavaConsumer {
     check("KotlinConsumer", "kotlin", """
 import com.alibabacloud.rum.AlibabaCloudRum
 import com.alibabacloud.rum.event.CustomEvent
+import com.alibabacloud.rum.event.ResourceEvent
+import com.alibabacloud.rum.event.ResourceSuccess
 fun register(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
     val source: String = context.source
     val parameters: Map<*, *>? = context.getNativeObject("originalParameters", Map::class.java)
@@ -106,6 +121,20 @@ fun register(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context -
         val group: String? = event.group
         val snapshots: String? = event.snapshots
         if (!event.setName("") || !event.setGroup(" ") || !event.setSnapshots("plain text")) {
+            return@setEventInterceptor null
+        }
+    }
+    if (event is ResourceEvent) {
+        val name: String? = event.name
+        val message: String? = event.message
+        val snapshots: String? = event.snapshots
+        val statusCode: Long? = event.statusCode
+        val success: Int? = event.success
+        val unknown: Int = ResourceSuccess.UNKNOWN.value
+        if (!event.setName("") || !event.setMessage(" ") || !event.setSnapshots("plain text")
+            || !event.setResourceResult(Long.MIN_VALUE, ResourceSuccess.UNKNOWN)
+            || !event.setResourceResult(Long.MAX_VALUE, ResourceSuccess.SUCCESS)
+            || !event.setResourceResult(1001L, ResourceSuccess.FAILED)) {
             return@setEventInterceptor null
         }
     }
@@ -121,6 +150,19 @@ fun clear(): Boolean = AlibabaCloudRum.setEventInterceptor(null)
         "NoRemove": "class NoRemove { void edit(RumEvent e) { e.removeAttribute(\"custom.name\"); } }",
         "NoClone": "class NoClone { Object copy(CustomEvent e) { return e.clone(); } }",
         "NoInternalAccessor": "class NoInternalAccessor { Object raw(RumEvent e) { return e.getCandidate(); } }",
+        "NoResourceConstruct": "class NoResourceConstruct { Object create() { return new ResourceEvent(null); } }",
+        "NoResourceSubclass": "class NoResourceSubclass extends ResourceEvent {"
+                              " NoResourceSubclass() { super(null); } }",
+        "NoResourceClone": "class NoResourceClone { Object copy(ResourceEvent e) { return e.clone(); } }",
+        "NoStatusCodeSetter": "class NoStatusCodeSetter { void edit(ResourceEvent e) { e.setStatusCode(1001L); } }",
+        "NoSuccessSetter": "class NoSuccessSetter { void edit(ResourceEvent e) {"
+                           " e.setSuccess(ResourceSuccess.FAILED); } }",
+        "NoUrlSetter": "class NoUrlSetter { void edit(ResourceEvent e) { e.setUrl(\"https://example.invalid\"); } }",
+        "NoBaseResourceResult": "class NoBaseResourceResult { void edit(RumEvent e) {"
+                                " e.setResourceResult(1001L, ResourceSuccess.FAILED); } }",
+        "NoCustomResourceResult": "class NoCustomResourceResult { void edit(CustomEvent e) {"
+                                  " e.setResourceResult(1001L, ResourceSuccess.FAILED); } }",
+        "NoResourceGroup": "class NoResourceGroup { void edit(ResourceEvent e) { e.setGroup(\"x\"); } }",
     }
     for name, source in negative_java.items():
         check(name, "java", java_prefix + source, False)
@@ -133,8 +175,20 @@ fun clear(): Boolean = AlibabaCloudRum.setEventInterceptor(null)
           "fun edit(e: RumEvent) { e.setAttribute(\"session.id\", \"x\") }", False)
     check("KotlinBooleanSetter", "kotlin",
           "import com.alibabacloud.rum.event.CustomEvent\nfun edit(e: CustomEvent) { e.name = \"x\" }", False)
+    check("KotlinNoResourceConstruct", "kotlin",
+          "import com.alibabacloud.rum.event.ResourceEvent\nfun create() = ResourceEvent(null)", False)
+    for suffix, expected_type, getter in (("Name", "String", "name"), ("Message", "String", "message"),
+                                           ("Snapshots", "String", "snapshots"),
+                                           ("StatusCode", "Long", "statusCode"), ("Success", "Int", "success")):
+        check("KotlinResourceNullable" + suffix, "kotlin",
+              "import com.alibabacloud.rum.event.ResourceEvent\n"
+              f"fun value(e: ResourceEvent): {expected_type} = e.{getter}", False)
+    check("KotlinResourceBooleanSetter", "kotlin",
+          "import com.alibabacloud.rum.event.ResourceEvent\nfun edit(e: ResourceEvent) { e.message = \"x\" }", False)
+    check("KotlinResourceNoResultAssignment", "kotlin",
+          "import com.alibabacloud.rum.event.ResourceEvent\nfun edit(e: ResourceEvent) { e.statusCode = 1001L }", False)
 
-    for name in ("RumEvent", "CustomEvent", "EventContext", "EventInterceptor"):
+    for name in ("RumEvent", "CustomEvent", "ResourceEvent", "ResourceSuccess", "EventContext", "EventInterceptor"):
         result = subprocess.run(["javap", "-public", "-classpath", classpath,
                                  "com.alibabacloud.rum.event." + name], capture_output=True, text=True, check=True)
         (output / f"{name}.api.txt").write_text(result.stdout)

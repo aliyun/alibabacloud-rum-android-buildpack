@@ -180,7 +180,7 @@ public class AlibabaCloudRum {
     }
 
     /**
-     * 注册、替换或清除原生 Custom event/log 加工规则，任何生命周期阶段均可调用。
+     * 注册、替换或清除原生 Custom event/log 与手动 Resource 加工规则，任何生命周期阶段均可调用。
      * null 清除注册；成功返回 true，实际失败返回 false 并保留原注册。
      * 以实际回调入口的当前注册为准，启动后设置不会补调已经处理的事件。
      * 回调并发、候选提交与业务 API 调用限制见 {@link EventInterceptor}。

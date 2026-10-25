@@ -2,6 +2,8 @@
 -keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
 -keep public class com.alibabacloud.rum.event.RumEvent { public *; }
 -keep public class com.alibabacloud.rum.event.CustomEvent { public *; }
+-keep public class com.alibabacloud.rum.event.ResourceEvent { public *; }
+-keep public enum com.alibabacloud.rum.event.ResourceSuccess { public *; }
 -keep public class com.alibabacloud.rum.event.EventContext { public *; }
 -keep public interface com.alibabacloud.rum.event.EventInterceptor { public *; }
 -keepclassmembers class com.alibabacloud.rum.AlibabaCloudRum {
