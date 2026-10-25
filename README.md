@@ -1,6 +1,6 @@
 # Android RUM buildpack
 
-公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、手动 Resource、OkHttp2 与 URLConnection Resource 的统一加工接口位于
+公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、View、Action、手动 Resource、OkHttp2 与 URLConnection Resource 的统一加工接口位于
 `com.alibabacloud.rum.event`，用法与生命周期、候选提交、只读属性及上下文借用约束见工作区的
 [EventInterceptor 接入说明](../docs/android/event-interceptor.md) 和各公开类型的 Javadoc。
 
@@ -114,6 +114,59 @@ body 可读或完整。规则不能消费、关闭、改写宿主流，不能重
 若 `finalize` 是首次终结入口，SDK 跳过用户 interceptor，继续既有默认采集与清理；
 不会把这条输出当作 drop，也不通过后台补调。若正常终结已完成，后到的 finalizer 不重复加工。
 
+## Action 加工与操作收尾
+
+原生操作来源使用 `source=action.native`，通过独立的 `ActionEvent` 识别。
+只允许 `setName` 修改 `action.name`、`setSnapshots` 修改 `action.snapshots`；
+操作类型、其它分类、身份、View/Session 关联、采样与计时字段只读。
+`String getName()/getSnapshots()` 可返回 `null`，成功修改后立即读取候选的新值。
+
+```java
+import android.view.View;
+
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ActionEvent;
+
+AlibabaCloudRum.setEventInterceptor((event, context) -> {
+    if (event instanceof ActionEvent && "action.native".equals(context.getSource())) {
+        ActionEvent action = (ActionEvent) event;
+        View target = context.getNativeObject("targetView", View.class);
+        Object actionType = action.getAttribute("action.type");
+        action.setName("checkout.confirmed");
+        action.setSnapshots("business state: confirmed");
+    }
+    return event;
+});
+```
+
+两个 setter 返回 `boolean`，接受空字符串、纯空白及非 JSON 文本；snapshots 整串替换，不解析、合并或重跑 Provider，
+原字段缺失时也能显式设置。`null` 返回 `false`、不删除字段，并保留此前成功的修改。没有通用写入、remove/clear、
+独立类型 setter 或客户可用的构造、继承、clone/builder 能力。
+必须显式返回本次传入的同一 `event` 才提交；返回 `null` 丢弃这份输出，异常或返回另一候选整体回退原事件。
+回调返回后候选不能再修改 final。修改、丢弃及回调失败均不改变宿主操作、原回调和内部操作结束/状态清理。
+
+| `source` | 槽 | 原生类型 | 可用条件 |
+| --- | --- | --- | --- |
+| `action.native` | `targetView` | `android.view.View` | View/RadioGroup/List/Expandable 点击、触摸入口的实际控件，或手势完成点仍有效的目标控件 |
+| `action.native` | `dialog` | `android.app.Dialog` | 原生 Dialog 点击入口已有的 Dialog |
+| `action.native` | `menuItem` | `android.view.MenuItem` | 原生菜单入口的实际参数 |
+| `action.native` | `motionEvent` | `android.view.MotionEvent` | 触摸原参数；手势完成点使用既有生命周期内的 UP/CANCEL 副本 |
+| `action.native` | `keyEvent` | `android.view.KeyEvent` | 返回键入口已有的按键参数 |
+| `action.native` | `originalParameters` | `java.util.Map` | 当前入口已有的 `actionName`、`actionType` 等标量参数，只读外层容器 |
+
+`originalParameters` 包含加工前的 `actionName`、`actionType`；Dialog 另有 `whichButton`，RadioGroup 有 `checkedId`，
+List 有 `position`，Expandable 有 `parentPosition`/`childPosition`，Tab 有 `tabName`，手势有
+`startTimestamp`/`startTimeNano`。这些值与候选修改独立，不在该容器中放入 UI 对象。
+
+上述槽均可空，Tab 或既有内部操作入口可能没有活 UI 对象，仍正常加工；缺失、类型不匹配或回调结束后访问返回 `null`。
+上下文仅回调期借用，不保留、改写、主动回收或放入异步任务/导出数据；访问不依赖 SnapshotProvider。
+SDK 在真实完成点的当前线程同步执行规则，不切换主线程补读 UI，也不为补齐上下文延长控件生命周期。
+只能在原生对象允许的线程上读取对象；多个事件可并发进入规则，处理必须线程安全、快速且无阻塞。
+用户回调不计入已固定的操作计时，耗时仍会延长当前完成路径。
+
+不要在 interceptor 中调用 `setCustomEvent`、`setCustomLog`、`setCustomMetric`、`setCustomException`、
+`reportCustomResource` 等会生成业务事件的 API；规则内部可以读取数据、使用专用 setter 或注册、替换、清除 interceptor。
+
 ## 验证公开产物
 
 先将本轮内部 SDK 的 `:alibabacloud-rum-android-sdk:assembleDistribute` 产物放到
@@ -125,16 +178,16 @@ python3 scripts/verify-event-api.py \
   alibabacloud-android-rum-sdk/build/outputs/aar/alibabacloud-android-rum-sdk-release.aar --okhttp2
 ```
 
-脚本从指定 AAR 提取实际类，验证 Java/Kotlin SAM、Custom/Resource 可空读取、64 位成对结果、boolean setter，
+脚本从指定 AAR 提取实际类，验证 Java/Kotlin SAM、Custom/Resource/View/Action 可空读取、64 位成对结果、boolean setter，
 以及 JDK 原生 URLConnection 四槽的类型安全读取；验证构造、克隆、通用写入、独立结果 setter、URL 改写、
 context 写入及错误原生类型赋值等负例，并检查公开签名没有泄漏内部事件模型。
-consumer rules 保留公开 Resource 类型和三态枚举。证据记录 AAR 的 SHA-256，默认保存在
+consumer rules 保留公开事件类型（含 ActionEvent）和三态枚举。证据记录 AAR 的 SHA-256，默认保存在
 `~/tmp/`。需要 JDK，以及本机 Gradle 缓存中的 Kotlin 1.9.22 编译器及其运行依赖；缺少依赖时
 明确失败。`--output` 可指定证据目录，`--kotlin-version` 可指定已缓存的兼容编译器版本。
 `--okhttp2` 额外使用缓存的 OkHttp 2.7.5 编译 Java/Kotlin 原生 request/response/error 读取样例，
 不改变公共 API 的基础依赖。
 
-消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2/URLConnection 场景或最终导出验证。发布链必须使用本轮 SDK →
+消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2/URLConnection/View/Action 场景或最终导出验证。发布链必须使用本轮 SDK →
 buildpack → 宿主产物，不以源码接缝测试或旧 AAR 代替。
 
 模块 `build.gradle` 将内嵌 SDK AAR 的 SHA-256 登记为 TransformR 输入，避免 fat-aar 1.3.8

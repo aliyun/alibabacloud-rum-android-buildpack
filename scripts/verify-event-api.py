@@ -160,6 +160,41 @@ fun register(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context -
 }
 fun clear(): Boolean = AlibabaCloudRum.setEventInterceptor(null)
 """)
+    check("JavaActionConsumer", "java", """
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ActionEvent;
+final class JavaActionConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ActionEvent) {
+                ActionEvent action = (ActionEvent) event;
+                String name = action.getName(), snapshots = action.getSnapshots();
+                Object type = action.getAttribute("action.type");
+                String source = context.getSource();
+                boolean changed = action.setName("checkout.confirmed") && action.setSnapshots("plain text");
+                if (!changed) return null;
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinActionConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ActionEvent
+fun registerAction(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ActionEvent) {
+        val name: String? = event.name
+        val snapshots: String? = event.snapshots
+        val type: Any? = event.getAttribute("action.type")
+        val source: String = context.source
+        if (!event.setName("checkout.confirmed") || !event.setSnapshots("plain text")) {
+            return@setEventInterceptor null
+        }
+    }
+    event
+}
+""")
     check("JavaURLConnectionConsumer", "java", """
 import com.alibabacloud.rum.AlibabaCloudRum;
 import com.alibabacloud.rum.event.ResourceEvent;
@@ -279,6 +314,21 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         "NoViewRemove": "class NoViewRemove { void edit(ViewEvent e) { e.removeAttribute(\"view.name\"); } }",
         "NoViewClear": "class NoViewClear { void edit(ViewEvent e) { e.clearSnapshots(); } }",
         "NoViewSpanAccessor": "class NoViewSpanAccessor { Object raw(ViewEvent e) { return e.getSpan(); } }",
+        "NoActionConstruct": "class NoActionConstruct { Object create() { return new ActionEvent(null); } }",
+        "NoActionSubclass": "class NoActionSubclass extends ActionEvent { NoActionSubclass() { super(null); } }",
+        "NoActionClone": "class NoActionClone { Object copy(ActionEvent e) { return e.clone(); } }",
+        "NoActionIdSetter": "class NoActionIdSetter { void edit(ActionEvent e) { e.setId(\"x\"); } }",
+        "NoActionTypeSetter": "class NoActionTypeSetter { void edit(ActionEvent e) { e.setType(\"x\"); } }",
+        "NoActionDurationSetter": "class NoActionDurationSetter { void edit(ActionEvent e) { e.setDuration(1L); } }",
+        "NoActionMessageSetter": "class NoActionMessageSetter { void edit(ActionEvent e) { e.setMessage(\"x\"); } }",
+        "NoActionGroupSetter": "class NoActionGroupSetter { void edit(ActionEvent e) { e.setGroup(\"x\"); } }",
+        "NoActionResourceResult": "class NoActionResourceResult { void edit(ActionEvent e) {"
+                                  " e.setResourceResult(1001L, ResourceSuccess.FAILED); } }",
+        "NoActionGenericWrite": "class NoActionGenericWrite { void edit(ActionEvent e) {"
+                                " e.setAttribute(\"action.type\", \"x\"); } }",
+        "NoActionRemove": "class NoActionRemove { void edit(ActionEvent e) { e.removeAttribute(\"action.name\"); } }",
+        "NoActionClear": "class NoActionClear { void edit(ActionEvent e) { e.clearSnapshots(); } }",
+        "NoActionSpanAccessor": "class NoActionSpanAccessor { Object raw(ActionEvent e) { return e.getSpan(); } }",
         "NoBaseNameSetter": "class NoBaseNameSetter { void edit(RumEvent e) { e.setName(\"x\"); } }",
         "NoBaseSnapshotsSetter": "class NoBaseSnapshotsSetter { void edit(RumEvent e) { e.setSnapshots(\"x\"); } }",
         "NoContextConstruct": "class NoContextConstruct { Object create() { return new EventContext(null); } }",
@@ -326,6 +376,15 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
               f"fun edit(e: ViewEvent) {{ e.{getter} = \"x\" }}", False)
     check("KotlinNoContextConstruct", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\nfun create() = EventContext(null)", False)
+    check("KotlinNoActionConstruct", "kotlin",
+          "import com.alibabacloud.rum.event.ActionEvent\nfun create() = ActionEvent(null)", False)
+    for getter in ("name", "snapshots"):
+        check("KotlinActionNullable" + getter.title(), "kotlin",
+              "import com.alibabacloud.rum.event.ActionEvent\n"
+              f"fun value(e: ActionEvent): String = e.{getter}", False)
+        check("KotlinActionBoolean" + getter.title() + "Setter", "kotlin",
+              "import com.alibabacloud.rum.event.ActionEvent\n"
+              f"fun edit(e: ActionEvent) {{ e.{getter} = \"x\" }}", False)
     check("KotlinNoContextSourceAssignment", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\n"
           "fun edit(c: EventContext) { c.source = \"resource.urlconnection\" }", False)
@@ -338,7 +397,8 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
               f"fun value(c: EventContext): {native_type} = c.getNativeObject(\"{slot}\", {native_type}::class.java)",
               False)
 
-    for name in ("RumEvent", "CustomEvent", "ResourceEvent", "ResourceSuccess", "ViewEvent", "EventContext", "EventInterceptor"):
+    for name in ("RumEvent", "CustomEvent", "ResourceEvent", "ResourceSuccess", "ViewEvent", "ActionEvent",
+                 "EventContext", "EventInterceptor"):
         result = subprocess.run(["javap", "-public", "-classpath", classpath,
                                  "com.alibabacloud.rum.event." + name], capture_output=True, text=True, check=True)
         (output / f"{name}.api.txt").write_text(result.stdout)
