@@ -50,7 +50,9 @@ def main():
     classpath = os.pathsep.join(map(str, jars + [annotation, stdlib] + native_jars))
     compiler_classpath = os.pathsep.join(map(str, [compiler, stdlib, runtime, reflect, trove, annotations]))
     evidence = {"aar": str(args.aar.resolve()), "sha256": hashlib.sha256(args.aar.read_bytes()).hexdigest(),
-                "kotlin_version": args.kotlin_version, "checks": []}
+                "kotlin_version": args.kotlin_version,
+                "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
+                "checks": []}
 
     def check(name, language, source, should_compile=True):
         extension = "java" if language == "java" else "kt"
@@ -144,6 +146,48 @@ fun register(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context -
 }
 fun clear(): Boolean = AlibabaCloudRum.setEventInterceptor(null)
 """)
+    check("JavaURLConnectionConsumer", "java", """
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ResourceEvent;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import javax.net.ssl.HttpsURLConnection;
+final class JavaURLConnectionConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ResourceEvent && "resource.urlconnection".equals(context.getSource())) {
+                HttpURLConnection connection = context.getNativeObject("connection", HttpURLConnection.class);
+                HttpsURLConnection secureConnection = context.getNativeObject("connection", HttpsURLConnection.class);
+                InputStream input = context.getNativeObject("inputStream", InputStream.class);
+                OutputStream output = context.getNativeObject("outputStream", OutputStream.class);
+                Throwable error = context.getNativeObject("error", Throwable.class);
+                if (!((ResourceEvent) event).setName("/orders/:id")) return null;
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinURLConnectionConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ResourceEvent
+import java.io.InputStream
+import java.io.OutputStream
+import java.net.HttpURLConnection
+import javax.net.ssl.HttpsURLConnection
+fun registerURLConnection(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ResourceEvent && context.source == "resource.urlconnection") {
+        val connection: HttpURLConnection? = context.getNativeObject("connection", HttpURLConnection::class.java)
+        val secureConnection: HttpsURLConnection? = context.getNativeObject("connection", HttpsURLConnection::class.java)
+        val input: InputStream? = context.getNativeObject("inputStream", InputStream::class.java)
+        val output: OutputStream? = context.getNativeObject("outputStream", OutputStream::class.java)
+        val error: Throwable? = context.getNativeObject("error", Throwable::class.java)
+        if (!event.setName("/orders/:id")) return@setEventInterceptor null
+    }
+    event
+}
+""")
     if args.okhttp2:
         check("JavaOkHttp2Consumer", "java", """
 import com.alibabacloud.rum.AlibabaCloudRum;
@@ -209,6 +253,16 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         "NoCustomResourceResult": "class NoCustomResourceResult { void edit(CustomEvent e) {"
                                   " e.setResourceResult(1001L, ResourceSuccess.FAILED); } }",
         "NoResourceGroup": "class NoResourceGroup { void edit(ResourceEvent e) { e.setGroup(\"x\"); } }",
+        "NoContextConstruct": "class NoContextConstruct { Object create() { return new EventContext(null); } }",
+        "NoContextSubclass": "class NoContextSubclass extends EventContext {"
+                             " NoContextSubclass() { super(null); } }",
+        "NoContextSourceSetter": "class NoContextSourceSetter { void edit(EventContext c) {"
+                                 " c.setSource(\"resource.urlconnection\"); } }",
+        "NoNativeObjectSetter": "class NoNativeObjectSetter { void edit(EventContext c) {"
+                                " c.setNativeObject(\"connection\", new Object()); } }",
+        "NoMismatchedNativeType": "class NoMismatchedNativeType { void read(EventContext c) {"
+                                  " java.net.HttpURLConnection value ="
+                                  " c.getNativeObject(\"connection\", java.io.InputStream.class); } }",
     }
     for name, source in negative_java.items():
         check(name, "java", java_prefix + source, False)
@@ -233,6 +287,19 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
           "import com.alibabacloud.rum.event.ResourceEvent\nfun edit(e: ResourceEvent) { e.message = \"x\" }", False)
     check("KotlinResourceNoResultAssignment", "kotlin",
           "import com.alibabacloud.rum.event.ResourceEvent\nfun edit(e: ResourceEvent) { e.statusCode = 1001L }", False)
+    check("KotlinNoContextConstruct", "kotlin",
+          "import com.alibabacloud.rum.event.EventContext\nfun create() = EventContext(null)", False)
+    check("KotlinNoContextSourceAssignment", "kotlin",
+          "import com.alibabacloud.rum.event.EventContext\n"
+          "fun edit(c: EventContext) { c.source = \"resource.urlconnection\" }", False)
+    for suffix, native_type, slot in (("Connection", "java.net.HttpURLConnection", "connection"),
+                                      ("Input", "java.io.InputStream", "inputStream"),
+                                      ("Output", "java.io.OutputStream", "outputStream"),
+                                      ("Error", "Throwable", "error")):
+        check("KotlinNativeNullable" + suffix, "kotlin",
+              "import com.alibabacloud.rum.event.EventContext\n"
+              f"fun value(c: EventContext): {native_type} = c.getNativeObject(\"{slot}\", {native_type}::class.java)",
+              False)
 
     for name in ("RumEvent", "CustomEvent", "ResourceEvent", "ResourceSuccess", "EventContext", "EventInterceptor"):
         result = subprocess.run(["javap", "-public", "-classpath", classpath,

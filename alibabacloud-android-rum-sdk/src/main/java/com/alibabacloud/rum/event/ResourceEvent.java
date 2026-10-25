@@ -6,7 +6,7 @@ import androidx.annotation.Nullable;
 import com.alibabacloud.rum.core.event.EventCandidate;
 
 /**
- * 原生手动 Resource 的候选。URL、关联、采样与计时字段只读。
+ * 已接入来源的原生 Resource 候选。具体来源见 EventContext；URL、关联、采样与计时字段只读。
  * setter 只在本次同步回调中有效；非法输入返回 false，不改变此前成功的修改。
  */
 public final class ResourceEvent extends RumEvent {

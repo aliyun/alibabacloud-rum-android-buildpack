@@ -14,6 +14,12 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
  * resource.okhttp2 提供 request（com.squareup.okhttp.Request）、response（成功时的
  * com.squareup.okhttp.Response）和 error（失败时已有的 IOException）三个槽；originalParameters 为空。
  * 此回调在 chain.proceed 完成后、响应或原错误交还宿主前，于当前请求线程同步执行。
+ * resource.urlconnection 同时适用于 HTTP/HTTPS，提供 connection（实际的 HttpURLConnection，
+ * HTTPS 为 HttpsURLConnection）、inputStream（已取得的原始 InputStream）、
+ * outputStream（已取得的原始 OutputStream）和 error（已有的终结 Throwable）四个可空槽；
+ * 没有独立 request、response 或 originalParameters。SDK 不补取或创建流。
+ * 回调在 EOF、close、error、disconnect 的当前终结线程同步执行，同一资源只加工一次；
+ * finalize 首次终结时跳过用户回调，继续默认采集与清理，不在后台补调。
  * headers/body 通过原生对象访问；body 可能已消费、关闭或不可安全读取，不保证完整可读。
  * 不得消费、关闭或改写宿主的请求/响应流；SnapshotProvider 开关不影响原生对象访问。
  * 缺失、类型不匹配或回调已结束时，getNativeObject 返回 null。

@@ -1,13 +1,14 @@
 # Android RUM buildpack
 
-公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、手动 Resource 与 OkHttp2 Resource 的统一加工接口位于
+公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、手动 Resource、OkHttp2 与 URLConnection Resource 的统一加工接口位于
 `com.alibabacloud.rum.event`，用法与生命周期、候选提交、只读属性及上下文借用约束见工作区的
 [EventInterceptor 接入说明](../docs/android/event-interceptor.md) 和各公开类型的 Javadoc。
 
 ## Resource 加工
 
 当前支持既有 `AlibabaCloudRum.reportCustomResource(...)` 产生的手动 Resource，
-`EventContext.getSource()` 为 `resource.manual`；OkHttp2 自动来源使用 `resource.okhttp2`。OkHttp3、URLConnection 等其它自动来源仍按各自既有流程处理，
+`EventContext.getSource()` 为 `resource.manual`；OkHttp2 自动来源使用 `resource.okhttp2`，
+HttpURLConnection / HttpsURLConnection 共用 `resource.urlconnection`。OkHttp3 等其它自动来源仍按各自既有流程处理，
 不能由 `ResourceEvent` 类型存在推断这些来源已支持 interceptor。
 
 ```java
@@ -74,6 +75,45 @@ SDK 不为此读取、复制、缓存或导出 headers/body。body 可能已消�
 消费/关闭宿主流，也不得改写请求或响应。业务结果可依据安全可读的 response header 设置，
 修改或过滤 RUM 输出不会改变宿主收到的响应与错误。规则应快速完成，耗时会延长当前请求返回。
 
+## URLConnection 原生上下文
+
+HttpURLConnection 与 HttpsURLConnection 使用同一 `ResourceEvent` 和
+`source=resource.urlconnection`，无需 OkHttp 依赖。正常 EOF、流 close、错误与 disconnect
+在触发终结的当前线程同步加工；同一资源的多个终结入口只处理一次。
+
+| 槽 | 原生类型 | 可用条件 |
+| --- | --- | --- |
+| `connection` | `java.net.HttpURLConnection`；HTTPS 实际为 `javax.net.ssl.HttpsURLConnection` | 该采集包装器的实际 delegate |
+| `inputStream` | `java.io.InputStream` | 宿主此前实际取得的底层输入流；尚未取得时为空 |
+| `outputStream` | `java.io.OutputStream` | 宿主此前实际取得的底层输出流；尚未取得时为空 |
+| `error` | `java.lang.Throwable` | 终结时已有的原始错误；正常终结时为空 |
+
+没有独立的 `request`、`response` 或 `originalParameters`，这些槽返回 `null`。按类型安全方式读取：
+
+```java
+AlibabaCloudRum.setEventInterceptor((event, context) -> {
+    if (event instanceof ResourceEvent && "resource.urlconnection".equals(context.getSource())) {
+        java.net.HttpURLConnection connection =
+            context.getNativeObject("connection", java.net.HttpURLConnection.class);
+        java.io.InputStream input = context.getNativeObject("inputStream", java.io.InputStream.class);
+        java.io.OutputStream output = context.getNativeObject("outputStream", java.io.OutputStream.class);
+        Throwable error = context.getNativeObject("error", Throwable.class);
+        ((ResourceEvent) event).setName("/orders/:id");
+    }
+    return event;
+});
+```
+
+这些引用只在回调期借用，结束后访问返回 `null`，且不依赖 SnapshotProvider。SDK 不调用
+`getInputStream`、`getOutputStream` 或 `getErrorStream` 补取流，也不读取、复制、缓存或重放 body。
+EOF、close、disconnect 或失败时，原生流可能已消费、关闭、部分可用或不可读取；有流引用不保证
+body 可读或完整。规则不能消费、关闭、改写宿主流，不能重新连接或修改连接配置；缺少流也继续加工。
+修改、丢弃或规则异常不改变宿主的返回、错误与清理行为。回调耗时不计入已经固定的网络指标，
+但仍会延长当前终结操作，规则须支持并发且快速完成。
+
+若 `finalize` 是首次终结入口，SDK 跳过用户 interceptor，继续既有默认采集与清理；
+不会把这条输出当作 drop，也不通过后台补调。若正常终结已完成，后到的 finalizer 不重复加工。
+
 ## 验证公开产物
 
 先将本轮内部 SDK 的 `:alibabacloud-rum-android-sdk:assembleDistribute` 产物放到
@@ -86,14 +126,15 @@ python3 scripts/verify-event-api.py \
 ```
 
 脚本从指定 AAR 提取实际类，验证 Java/Kotlin SAM、Custom/Resource 可空读取、64 位成对结果、boolean setter，
-以及构造、克隆、通用写入、独立结果 setter、URL 改写等负例，并检查公开签名没有泄漏内部事件模型。
+以及 JDK 原生 URLConnection 四槽的类型安全读取；验证构造、克隆、通用写入、独立结果 setter、URL 改写、
+context 写入及错误原生类型赋值等负例，并检查公开签名没有泄漏内部事件模型。
 consumer rules 保留公开 Resource 类型和三态枚举。证据记录 AAR 的 SHA-256，默认保存在
 `~/tmp/`。需要 JDK，以及本机 Gradle 缓存中的 Kotlin 1.9.22 编译器及其运行依赖；缺少依赖时
 明确失败。`--output` 可指定证据目录，`--kotlin-version` 可指定已缓存的兼容编译器版本。
 `--okhttp2` 额外使用缓存的 OkHttp 2.7.5 编译 Java/Kotlin 原生 request/response/error 读取样例，
 不改变公共 API 的基础依赖。
 
-消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2 场景或最终导出验证。发布链必须使用本轮 SDK →
+消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2/URLConnection 场景或最终导出验证。发布链必须使用本轮 SDK →
 buildpack → 宿主产物，不以源码接缝测试或旧 AAR 代替。
 
 模块 `build.gradle` 将内嵌 SDK AAR 的 SHA-256 登记为 TransformR 输入，避免 fat-aar 1.3.8
