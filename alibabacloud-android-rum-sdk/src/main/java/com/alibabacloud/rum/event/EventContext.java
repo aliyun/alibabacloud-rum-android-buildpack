@@ -11,6 +11,11 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
  * resource.manual 的同名槽包含 type、url、method、statusCode、errorMessage、success、provider、
  * traceContext、measuring 原参数；标量值及原对象只在回调中借用，容器只读。
  * 手动 Resource 没有 request / response 槽；不会为缺失对象创建网络请求或读取 headers/body。
+ * resource.okhttp2 提供 request（com.squareup.okhttp.Request）、response（成功时的
+ * com.squareup.okhttp.Response）和 error（失败时已有的 IOException）三个槽；originalParameters 为空。
+ * 此回调在 chain.proceed 完成后、响应或原错误交还宿主前，于当前请求线程同步执行。
+ * headers/body 通过原生对象访问；body 可能已消费、关闭或不可安全读取，不保证完整可读。
+ * 不得消费、关闭或改写宿主的请求/响应流；SnapshotProvider 开关不影响原生对象访问。
  * 缺失、类型不匹配或回调已结束时，getNativeObject 返回 null。
  * SDK 不为此额外读取、复制或自动导出原生 headers/body。
  */

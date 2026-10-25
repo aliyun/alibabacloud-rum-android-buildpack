@@ -22,6 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("aar", type=Path)
     parser.add_argument("--kotlin-version", default="1.9.22")
+    parser.add_argument("--okhttp2", action="store_true", help="Also compile typed OkHttp 2.7.5 context consumers")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     temporary_root = Path.home() / "tmp"
@@ -36,6 +37,7 @@ def main():
     reflect = cached_jar(cache, "org.jetbrains.kotlin", "kotlin-reflect", "1.6.10")
     trove = cached_jar(cache, "org.jetbrains.intellij.deps", "trove4j", "1.0.20200330")
     annotations = cached_jar(cache, "org.jetbrains", "annotations", "13.0")
+    native_jars = [cached_jar(cache, "com.squareup.okhttp", "okhttp", "2.7.5")] if args.okhttp2 else []
     jars = []
     with zipfile.ZipFile(args.aar) as archive:
         for name in archive.namelist():
@@ -45,7 +47,7 @@ def main():
                 jars.append(destination)
     if not jars:
         raise RuntimeError("AAR contains no Java classes")
-    classpath = os.pathsep.join(map(str, jars + [annotation, stdlib]))
+    classpath = os.pathsep.join(map(str, jars + [annotation, stdlib] + native_jars))
     compiler_classpath = os.pathsep.join(map(str, [compiler, stdlib, runtime, reflect, trove, annotations]))
     evidence = {"aar": str(args.aar.resolve()), "sha256": hashlib.sha256(args.aar.read_bytes()).hexdigest(),
                 "kotlin_version": args.kotlin_version, "checks": []}
@@ -141,6 +143,50 @@ fun register(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context -
     event
 }
 fun clear(): Boolean = AlibabaCloudRum.setEventInterceptor(null)
+""")
+    if args.okhttp2:
+        check("JavaOkHttp2Consumer", "java", """
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.*;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
+import java.io.IOException;
+final class JavaOkHttp2Consumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ResourceEvent && "resource.okhttp2".equals(context.getSource())) {
+                Request request = context.getNativeObject("request", Request.class);
+                Response response = context.getNativeObject("response", Response.class);
+                IOException error = context.getNativeObject("error", IOException.class);
+                if (request != null && response != null && error == null
+                    && "1001".equals(response.header("X-Test-Business-Code"))) {
+                    ((ResourceEvent) event).setResourceResult(1001L, ResourceSuccess.FAILED);
+                }
+            }
+            return event;
+        });
+    }
+}
+""")
+        check("KotlinOkHttp2Consumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ResourceEvent
+import com.alibabacloud.rum.event.ResourceSuccess
+import com.squareup.okhttp.Request
+import com.squareup.okhttp.Response
+import java.io.IOException
+fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ResourceEvent && context.source == "resource.okhttp2") {
+        val request: Request? = context.getNativeObject("request", Request::class.java)
+        val response: Response? = context.getNativeObject("response", Response::class.java)
+        val error: IOException? = context.getNativeObject("error", IOException::class.java)
+        if (request != null && response != null && error == null
+            && response.header("X-Test-Business-Code") == "1001") {
+            event.setResourceResult(1001L, ResourceSuccess.FAILED)
+        }
+    }
+    event
+}
 """)
     java_prefix = "import com.alibabacloud.rum.event.*;\n"
     negative_java = {

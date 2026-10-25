@@ -1,13 +1,13 @@
 # Android RUM buildpack
 
-公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log 与手动 Resource 的统一加工接口位于
+公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、手动 Resource 与 OkHttp2 Resource 的统一加工接口位于
 `com.alibabacloud.rum.event`，用法与生命周期、候选提交、只读属性及上下文借用约束见工作区的
 [EventInterceptor 接入说明](../docs/android/event-interceptor.md) 和各公开类型的 Javadoc。
 
-## 手动 Resource 加工
+## Resource 加工
 
 当前支持既有 `AlibabaCloudRum.reportCustomResource(...)` 产生的手动 Resource，
-`EventContext.getSource()` 为 `resource.manual`。OkHttp2、OkHttp3、URLConnection 等自动来源仍按各自既有流程处理，
+`EventContext.getSource()` 为 `resource.manual`；OkHttp2 自动来源使用 `resource.okhttp2`。OkHttp3、URLConnection 等其它自动来源仍按各自既有流程处理，
 不能由 `ResourceEvent` 类型存在推断这些来源已支持 interceptor。
 
 ```java
@@ -60,6 +60,20 @@ AlibabaCloudRum.setEventInterceptor((event, context) -> {
 `reportCustomResource` 等生成业务事件的 API。该约束通过接入文档说明，不新增运行时递归 guard。
 注册、替换与 `setEventInterceptor(null)` 清除仍可在任何生命周期阶段调用，之后的实际调用使用当时的注册。
 
+## OkHttp2 原生上下文
+
+OkHttp2 的 Resource 使用同一 `ResourceEvent` 与专用 setter。在 `chain.proceed` 成功或失败后、
+响应或原错误交还宿主前，SDK 在当前请求线程同步调用规则。可通过
+`context.getNativeObject("request", com.squareup.okhttp.Request.class)`、
+`getNativeObject("response", com.squareup.okhttp.Response.class)` 和
+`getNativeObject("error", java.io.IOException.class)` 读取该现场已有的引用；成功时 error 为空，
+失败时 response 为空。`originalParameters` 槽不适用于此来源。
+
+原生对象只在回调期间借用，回调结束后 context 不再提供这些引用。此访问不依赖 SnapshotProvider，
+SDK 不为此读取、复制、缓存或导出 headers/body。body 可能已消费、关闭或不可安全读取；规则不得
+消费/关闭宿主流，也不得改写请求或响应。业务结果可依据安全可读的 response header 设置，
+修改或过滤 RUM 输出不会改变宿主收到的响应与错误。规则应快速完成，耗时会延长当前请求返回。
+
 ## 验证公开产物
 
 先将本轮内部 SDK 的 `:alibabacloud-rum-android-sdk:assembleDistribute` 产物放到
@@ -68,7 +82,7 @@ AlibabaCloudRum.setEventInterceptor((event, context) -> {
 ```bash
 ./gradlew :alibabacloud-android-rum-sdk:testDebugUnitTest :alibabacloud-android-rum-sdk:assembleRelease
 python3 scripts/verify-event-api.py \
-  alibabacloud-android-rum-sdk/build/outputs/aar/alibabacloud-android-rum-sdk-release.aar
+  alibabacloud-android-rum-sdk/build/outputs/aar/alibabacloud-android-rum-sdk-release.aar --okhttp2
 ```
 
 脚本从指定 AAR 提取实际类，验证 Java/Kotlin SAM、Custom/Resource 可空读取、64 位成对结果、boolean setter，
@@ -76,8 +90,10 @@ python3 scripts/verify-event-api.py \
 consumer rules 保留公开 Resource 类型和三态枚举。证据记录 AAR 的 SHA-256，默认保存在
 `~/tmp/`。需要 JDK，以及本机 Gradle 缓存中的 Kotlin 1.9.22 编译器及其运行依赖；缺少依赖时
 明确失败。`--output` 可指定证据目录，`--kotlin-version` 可指定已缓存的兼容编译器版本。
+`--okhttp2` 额外使用缓存的 OkHttp 2.7.5 编译 Java/Kotlin 原生 request/response/error 读取样例，
+不改变公共 API 的基础依赖。
 
-消费检查不能代替真实宿主的 R8、Custom/手动 Resource 场景或最终导出验证。发布链必须使用本轮 SDK →
+消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2 场景或最终导出验证。发布链必须使用本轮 SDK →
 buildpack → 宿主产物，不以源码接缝测试或旧 AAR 代替。
 
 模块 `build.gradle` 将内嵌 SDK AAR 的 SHA-256 登记为 TransformR 输入，避免 fat-aar 1.3.8
