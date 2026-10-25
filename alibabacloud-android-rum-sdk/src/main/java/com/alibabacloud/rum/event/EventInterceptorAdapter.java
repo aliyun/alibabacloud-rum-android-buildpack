@@ -23,6 +23,8 @@ public final class EventInterceptorAdapter {
                     event = new CustomEvent(candidate);
                 } else if ("resource".equals(candidate.getEventType())) {
                     event = new ResourceEvent(candidate);
+                } else if ("view".equals(candidate.getEventType())) {
+                    event = new ViewEvent(candidate);
                 } else {
                     return EventInterceptorRegistry.invalidCandidate();
                 }

@@ -129,7 +129,8 @@ public class EventInterceptorApiTest {
 
     @Test
     public void publicEventSurfaceHasNoConstructionOrGenericMutation() {
-        Class<?>[] eventTypes = {RumEvent.class, CustomEvent.class, ResourceEvent.class, EventContext.class};
+        Class<?>[] eventTypes = {RumEvent.class, CustomEvent.class, ResourceEvent.class, ViewEvent.class,
+                EventContext.class};
         for (Class<?> type : eventTypes) {
             for (Constructor<?> constructor : type.getDeclaredConstructors()) {
                 assertFalse(Modifier.isPublic(constructor.getModifiers()));
@@ -138,12 +139,17 @@ public class EventInterceptorApiTest {
         }
         assertTrue(Modifier.isFinal(CustomEvent.class.getModifiers()));
         assertTrue(Modifier.isFinal(ResourceEvent.class.getModifiers()));
+        assertTrue(Modifier.isFinal(ViewEvent.class.getModifiers()));
         assertThrows(NoSuchMethodException.class,
                 () -> RumEvent.class.getMethod("setAttribute", String.class, Object.class));
         assertThrows(NoSuchMethodException.class,
                 () -> RumEvent.class.getMethod("removeAttribute", String.class));
         assertThrows(NoSuchMethodException.class, () -> CustomEvent.class.getMethod("clone"));
         assertThrows(NoSuchMethodException.class, () -> ResourceEvent.class.getMethod("clone"));
+        assertThrows(NoSuchMethodException.class, () -> ViewEvent.class.getMethod("clone"));
+        assertThrows(NoSuchMethodException.class, () -> ViewEvent.class.getMethod("setId", String.class));
+        assertThrows(NoSuchMethodException.class, () -> ViewEvent.class.getMethod("setMessage", String.class));
+        assertThrows(NoSuchMethodException.class, () -> ViewEvent.class.getMethod("clearSnapshots"));
         assertThrows(NoSuchMethodException.class,
                 () -> ResourceEvent.class.getMethod("setStatusCode", long.class));
         assertThrows(NoSuchMethodException.class,

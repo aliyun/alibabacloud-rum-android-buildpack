@@ -3,6 +3,7 @@
 -keep public class com.alibabacloud.rum.event.RumEvent { public *; }
 -keep public class com.alibabacloud.rum.event.CustomEvent { public *; }
 -keep public class com.alibabacloud.rum.event.ResourceEvent { public *; }
+-keep public class com.alibabacloud.rum.event.ViewEvent { public *; }
 -keep public enum com.alibabacloud.rum.event.ResourceSuccess { public *; }
 -keep public class com.alibabacloud.rum.event.EventContext { public *; }
 -keep public interface com.alibabacloud.rum.event.EventInterceptor { public *; }
