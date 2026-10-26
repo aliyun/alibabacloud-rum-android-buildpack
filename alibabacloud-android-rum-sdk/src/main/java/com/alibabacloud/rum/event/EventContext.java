@@ -11,6 +11,10 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
  * action.native 按实际入口提供可空 targetView（View）、dialog（Dialog）、menuItem（MenuItem）、
  * motionEvent（MotionEvent）、keyEvent（KeyEvent）槽；originalParameters 为 actionName、actionType 等
  * 当前入口已有的标量参数 Map。手势完成时 motionEvent 是既有生命周期内的 UP/CANCEL 副本。
+ * application.start 的 originalParameters 为 appStartType（String）、appStartDuration（Long，毫秒）、
+ * isFirstLaunch（Boolean，可空）原参数 Map；application.state 的同名槽含 changeType（String）。
+ * 两者在既有启动/状态完成线程当前同步回调，本轮没有 application 或 activity 原生对象槽；
+ * API29+ cold/hot 计时回调也不保证存在 Activity，不会为补齐上下文获取或强留 UI 对象。
  * 在实际操作完成点的当前线程同步执行；不会切换到主线程补读 UI，也不为缺失上下文强留 UI 对象。
  * 不得主动回收原生事件，或在后台线程读取只能在主线程访问的 UI；回调结束后所有原生槽均不可访问。
  * resource.manual 的同名槽包含 type、url、method、statusCode、errorMessage、success、provider、

@@ -51,6 +51,7 @@ def main():
     compiler_classpath = os.pathsep.join(map(str, [compiler, stdlib, runtime, reflect, trove, annotations]))
     evidence = {"aar": str(args.aar.resolve()), "sha256": hashlib.sha256(args.aar.read_bytes()).hexdigest(),
                 "kotlin_version": args.kotlin_version,
+                "application_sources": ["application.start", "application.state"],
                 "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
                 "checks": []}
 
@@ -195,6 +196,42 @@ fun registerAction(): Boolean = AlibabaCloudRum.setEventInterceptor { event, con
     event
 }
 """)
+    check("JavaApplicationConsumer", "java", """
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ApplicationEvent;
+import java.util.Map;
+final class JavaApplicationConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ApplicationEvent) {
+                ApplicationEvent application = (ApplicationEvent) event;
+                String snapshots = application.getSnapshots();
+                Object state = application.getAttribute("application.state");
+                Object duration = application.getAttribute("application.duration");
+                String source = context.getSource();
+                Map<?, ?> parameters = context.getNativeObject("originalParameters", Map.class);
+                if (!application.setSnapshots("plain text")) return null;
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinApplicationConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ApplicationEvent
+fun registerApplication(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ApplicationEvent) {
+        val snapshots: String? = event.snapshots
+        val state: Any? = event.getAttribute("application.state")
+        val duration: Any? = event.getAttribute("application.duration")
+        val source: String = context.source
+        val parameters: Map<*, *>? = context.getNativeObject("originalParameters", Map::class.java)
+        if (!event.setSnapshots("plain text")) return@setEventInterceptor null
+    }
+    event
+}
+""")
     check("JavaURLConnectionConsumer", "java", """
 import com.alibabacloud.rum.AlibabaCloudRum;
 import com.alibabacloud.rum.event.ResourceEvent;
@@ -329,6 +366,32 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         "NoActionRemove": "class NoActionRemove { void edit(ActionEvent e) { e.removeAttribute(\"action.name\"); } }",
         "NoActionClear": "class NoActionClear { void edit(ActionEvent e) { e.clearSnapshots(); } }",
         "NoActionSpanAccessor": "class NoActionSpanAccessor { Object raw(ActionEvent e) { return e.getSpan(); } }",
+        "NoApplicationConstruct": "class NoApplicationConstruct {"
+                                  " Object create() { return new ApplicationEvent(null); } }",
+        "NoApplicationSubclass": "class NoApplicationSubclass extends ApplicationEvent {"
+                                 " NoApplicationSubclass() { super(null); } }",
+        "NoApplicationClone": "class NoApplicationClone {"
+                              " Object copy(ApplicationEvent e) { return e.clone(); } }",
+        "NoApplicationStateSetter": "class NoApplicationStateSetter {"
+                                    " void edit(ApplicationEvent e) { e.setState(\"x\"); } }",
+        "NoApplicationDurationSetter": "class NoApplicationDurationSetter {"
+                                       " void edit(ApplicationEvent e) { e.setDuration(1L); } }",
+        "NoApplicationNameSetter": "class NoApplicationNameSetter {"
+                                   " void edit(ApplicationEvent e) { e.setName(\"x\"); } }",
+        "NoApplicationMessageSetter": "class NoApplicationMessageSetter {"
+                                      " void edit(ApplicationEvent e) { e.setMessage(\"x\"); } }",
+        "NoApplicationGroupSetter": "class NoApplicationGroupSetter {"
+                                    " void edit(ApplicationEvent e) { e.setGroup(\"x\"); } }",
+        "NoApplicationResourceResult": "class NoApplicationResourceResult { void edit(ApplicationEvent e) {"
+                                       " e.setResourceResult(1001L, ResourceSuccess.FAILED); } }",
+        "NoApplicationGenericWrite": "class NoApplicationGenericWrite { void edit(ApplicationEvent e) {"
+                                     " e.setAttribute(\"application.state\", \"x\"); } }",
+        "NoApplicationRemove": "class NoApplicationRemove {"
+                               " void edit(ApplicationEvent e) { e.removeAttribute(\"application.snapshots\"); } }",
+        "NoApplicationClear": "class NoApplicationClear {"
+                              " void edit(ApplicationEvent e) { e.clearSnapshots(); } }",
+        "NoApplicationSpanAccessor": "class NoApplicationSpanAccessor {"
+                                     " Object raw(ApplicationEvent e) { return e.getSpan(); } }",
         "NoBaseNameSetter": "class NoBaseNameSetter { void edit(RumEvent e) { e.setName(\"x\"); } }",
         "NoBaseSnapshotsSetter": "class NoBaseSnapshotsSetter { void edit(RumEvent e) { e.setSnapshots(\"x\"); } }",
         "NoContextConstruct": "class NoContextConstruct { Object create() { return new EventContext(null); } }",
@@ -385,6 +448,14 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         check("KotlinActionBoolean" + getter.title() + "Setter", "kotlin",
               "import com.alibabacloud.rum.event.ActionEvent\n"
               f"fun edit(e: ActionEvent) {{ e.{getter} = \"x\" }}", False)
+    check("KotlinNoApplicationConstruct", "kotlin",
+          "import com.alibabacloud.rum.event.ApplicationEvent\nfun create() = ApplicationEvent(null)", False)
+    check("KotlinApplicationNullableSnapshots", "kotlin",
+          "import com.alibabacloud.rum.event.ApplicationEvent\n"
+          "fun value(e: ApplicationEvent): String = e.snapshots", False)
+    check("KotlinApplicationBooleanSnapshotsSetter", "kotlin",
+          "import com.alibabacloud.rum.event.ApplicationEvent\n"
+          "fun edit(e: ApplicationEvent) { e.snapshots = \"x\" }", False)
     check("KotlinNoContextSourceAssignment", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\n"
           "fun edit(c: EventContext) { c.source = \"resource.urlconnection\" }", False)
@@ -398,6 +469,7 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
               False)
 
     for name in ("RumEvent", "CustomEvent", "ResourceEvent", "ResourceSuccess", "ViewEvent", "ActionEvent",
+                 "ApplicationEvent",
                  "EventContext", "EventInterceptor"):
         result = subprocess.run(["javap", "-public", "-classpath", classpath,
                                  "com.alibabacloud.rum.event." + name], capture_output=True, text=True, check=True)

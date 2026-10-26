@@ -130,7 +130,7 @@ public class EventInterceptorApiTest {
     @Test
     public void publicEventSurfaceHasNoConstructionOrGenericMutation() {
         Class<?>[] eventTypes = {RumEvent.class, CustomEvent.class, ResourceEvent.class, ViewEvent.class,
-                ActionEvent.class, EventContext.class};
+                ActionEvent.class, ApplicationEvent.class, EventContext.class};
         for (Class<?> type : eventTypes) {
             for (Constructor<?> constructor : type.getDeclaredConstructors()) {
                 assertFalse(Modifier.isPublic(constructor.getModifiers()));
@@ -141,6 +141,7 @@ public class EventInterceptorApiTest {
         assertTrue(Modifier.isFinal(ResourceEvent.class.getModifiers()));
         assertTrue(Modifier.isFinal(ViewEvent.class.getModifiers()));
         assertTrue(Modifier.isFinal(ActionEvent.class.getModifiers()));
+        assertTrue(Modifier.isFinal(ApplicationEvent.class.getModifiers()));
         assertThrows(NoSuchMethodException.class,
                 () -> RumEvent.class.getMethod("setAttribute", String.class, Object.class));
         assertThrows(NoSuchMethodException.class,
@@ -156,6 +157,11 @@ public class EventInterceptorApiTest {
         assertThrows(NoSuchMethodException.class, () -> ActionEvent.class.getMethod("setId", String.class));
         assertThrows(NoSuchMethodException.class, () -> ActionEvent.class.getMethod("setMessage", String.class));
         assertThrows(NoSuchMethodException.class, () -> ActionEvent.class.getMethod("clearSnapshots"));
+        assertThrows(NoSuchMethodException.class, () -> ApplicationEvent.class.getMethod("clone"));
+        assertThrows(NoSuchMethodException.class, () -> ApplicationEvent.class.getMethod("setState", String.class));
+        assertThrows(NoSuchMethodException.class, () -> ApplicationEvent.class.getMethod("setDuration", long.class));
+        assertThrows(NoSuchMethodException.class, () -> ApplicationEvent.class.getMethod("setName", String.class));
+        assertThrows(NoSuchMethodException.class, () -> ApplicationEvent.class.getMethod("clearSnapshots"));
         assertThrows(NoSuchMethodException.class,
                 () -> ResourceEvent.class.getMethod("setStatusCode", long.class));
         assertThrows(NoSuchMethodException.class,

@@ -5,6 +5,7 @@
 -keep public class com.alibabacloud.rum.event.ResourceEvent { public *; }
 -keep public class com.alibabacloud.rum.event.ViewEvent { public *; }
 -keep public class com.alibabacloud.rum.event.ActionEvent { public *; }
+-keep public class com.alibabacloud.rum.event.ApplicationEvent { public *; }
 -keep public enum com.alibabacloud.rum.event.ResourceSuccess { public *; }
 -keep public class com.alibabacloud.rum.event.EventContext { public *; }
 -keep public interface com.alibabacloud.rum.event.EventInterceptor { public *; }

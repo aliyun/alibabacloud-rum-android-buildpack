@@ -27,6 +27,8 @@ public final class EventInterceptorAdapter {
                     event = new ViewEvent(candidate);
                 } else if ("action".equals(candidate.getEventType())) {
                     event = new ActionEvent(candidate);
+                } else if ("application".equals(candidate.getEventType())) {
+                    event = new ApplicationEvent(candidate);
                 } else {
                     return EventInterceptorRegistry.invalidCandidate();
                 }
