@@ -8,6 +8,13 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
 /**
  * 同步回调期间借用的原始上下文；不得跨线程保留或修改原生对象。
  * custom.event / custom.log 的 originalParameters 槽为原入口参数 Map。
+ * exception.manual / exception.native 提供当前入口已有的 exception（Throwable，可空）与
+ * originalParameters（只读原参数 Map）槽。字符串入口没有 Throwable，不为补齐上下文制造对象。
+ * 立即 Throwable 入口原参数只有 exception；立即字符串入口为 type、crashName、crashMessage。
+ * 普通 reportException 原参数为 type、subType、causedBy、stacktrace；reportError 为
+ * name、subType、message、stacktrace、source、file、line、column，保留原值而不随候选修改。
+ * 既有启动缓冲仅保存事件字段，drain 时两槽均可空；SDK 不为 interceptor 额外持有原参数或 Throwable。
+ * 修改业务异常输出不改变 SDK 自监控使用的原始异常归因；fatal/native/ANR 恢复来源未在本类型首批接入。
  * action.native 按实际入口提供可空 targetView（View）、dialog（Dialog）、menuItem（MenuItem）、
  * motionEvent（MotionEvent）、keyEvent（KeyEvent）槽；originalParameters 为 actionName、actionType 等
  * 当前入口已有的标量参数 Map。手势完成时 motionEvent 是既有生命周期内的 UP/CANCEL 副本。

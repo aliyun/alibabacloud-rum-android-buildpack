@@ -52,6 +52,7 @@ def main():
     evidence = {"aar": str(args.aar.resolve()), "sha256": hashlib.sha256(args.aar.read_bytes()).hexdigest(),
                 "kotlin_version": args.kotlin_version,
                 "application_sources": ["application.start", "application.state"],
+                "exception_sources": ["exception.manual", "exception.native"],
                 "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
                 "checks": []}
 
@@ -232,6 +233,50 @@ fun registerApplication(): Boolean = AlibabaCloudRum.setEventInterceptor { event
     event
 }
 """)
+    check("JavaExceptionConsumer", "java", """
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ExceptionEvent;
+import java.util.Map;
+final class JavaExceptionConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ExceptionEvent) {
+                ExceptionEvent exception = (ExceptionEvent) event;
+                String name = exception.getName(), message = exception.getMessage();
+                String causedBy = exception.getCausedBy(), snapshots = exception.getSnapshots();
+                Object stack = exception.getAttribute("exception.stack");
+                String source = context.getSource();
+                Throwable original = context.getNativeObject("exception", Throwable.class);
+                Map<?, ?> parameters = context.getNativeObject("originalParameters", Map.class);
+                if (!exception.setName("") || !exception.setMessage(" ")
+                    || !exception.setCausedBy("business reason") || !exception.setSnapshots("not JSON")) return null;
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinExceptionConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ExceptionEvent
+fun registerException(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ExceptionEvent) {
+        val name: String? = event.name
+        val message: String? = event.message
+        val causedBy: String? = event.causedBy
+        val snapshots: String? = event.snapshots
+        val stack: Any? = event.getAttribute("exception.stack")
+        val source: String = context.source
+        val original: Throwable? = context.getNativeObject("exception", Throwable::class.java)
+        val parameters: Map<*, *>? = context.getNativeObject("originalParameters", Map::class.java)
+        if (!event.setName("") || !event.setMessage(" ")
+            || !event.setCausedBy("business reason") || !event.setSnapshots("not JSON")) {
+            return@setEventInterceptor null
+        }
+    }
+    event
+}
+""")
     check("JavaURLConnectionConsumer", "java", """
 import com.alibabacloud.rum.AlibabaCloudRum;
 import com.alibabacloud.rum.event.ResourceEvent;
@@ -392,6 +437,26 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
                               " void edit(ApplicationEvent e) { e.clearSnapshots(); } }",
         "NoApplicationSpanAccessor": "class NoApplicationSpanAccessor {"
                                      " Object raw(ApplicationEvent e) { return e.getSpan(); } }",
+        "NoExceptionConstruct": "class NoExceptionConstruct { Object create() { return new ExceptionEvent(null); } }",
+        "NoExceptionSubclass": "class NoExceptionSubclass extends ExceptionEvent {"
+                               " NoExceptionSubclass() { super(null); } }",
+        "NoExceptionClone": "class NoExceptionClone { Object copy(ExceptionEvent e) { return e.clone(); } }",
+        "NoExceptionTypeSetter": "class NoExceptionTypeSetter { void edit(ExceptionEvent e) { e.setType(\"x\"); } }",
+        "NoExceptionStackSetter": "class NoExceptionStackSetter { void edit(ExceptionEvent e) { e.setStack(\"x\"); } }",
+        "NoExceptionBinaryImagesSetter": "class NoExceptionBinaryImagesSetter {"
+                                         " void edit(ExceptionEvent e) { e.setBinaryImages(\"x\"); } }",
+        "NoExceptionResourceResult": "class NoExceptionResourceResult { void edit(ExceptionEvent e) {"
+                                     " e.setResourceResult(1001L, ResourceSuccess.FAILED); } }",
+        "NoExceptionGenericWrite": "class NoExceptionGenericWrite { void edit(ExceptionEvent e) {"
+                                   " e.setAttribute(\"thread.id\", 1L); } }",
+        "NoExceptionRemove": "class NoExceptionRemove {"
+                             " void edit(ExceptionEvent e) { e.removeAttribute(\"exception.message\"); } }",
+        "NoExceptionClear": "class NoExceptionClear { void edit(ExceptionEvent e) { e.clearSnapshots(); } }",
+        "NoExceptionSpanAccessor": "class NoExceptionSpanAccessor {"
+                                   " Object raw(ExceptionEvent e) { return e.getSpan(); } }",
+        "NoMismatchedExceptionType": "class NoMismatchedExceptionType { void read(EventContext c) {"
+                                     " java.io.IOException value ="
+                                     " c.getNativeObject(\"exception\", Throwable.class); } }",
         "NoBaseNameSetter": "class NoBaseNameSetter { void edit(RumEvent e) { e.setName(\"x\"); } }",
         "NoBaseSnapshotsSetter": "class NoBaseSnapshotsSetter { void edit(RumEvent e) { e.setSnapshots(\"x\"); } }",
         "NoContextConstruct": "class NoContextConstruct { Object create() { return new EventContext(null); } }",
@@ -456,6 +521,19 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
     check("KotlinApplicationBooleanSnapshotsSetter", "kotlin",
           "import com.alibabacloud.rum.event.ApplicationEvent\n"
           "fun edit(e: ApplicationEvent) { e.snapshots = \"x\" }", False)
+    check("KotlinNoExceptionConstruct", "kotlin",
+          "import com.alibabacloud.rum.event.ExceptionEvent\nfun create() = ExceptionEvent(null)", False)
+    for getter in ("name", "message", "causedBy", "snapshots"):
+        suffix = getter[0].upper() + getter[1:]
+        check("KotlinExceptionNullable" + suffix, "kotlin",
+              "import com.alibabacloud.rum.event.ExceptionEvent\n"
+              f"fun value(e: ExceptionEvent): String = e.{getter}", False)
+        check("KotlinExceptionBoolean" + suffix + "Setter", "kotlin",
+              "import com.alibabacloud.rum.event.ExceptionEvent\n"
+              f"fun edit(e: ExceptionEvent) {{ e.{getter} = \"x\" }}", False)
+    check("KotlinExceptionNullableObject", "kotlin",
+          "import com.alibabacloud.rum.event.EventContext\n"
+          "fun value(c: EventContext): Throwable = c.getNativeObject(\"exception\", Throwable::class.java)", False)
     check("KotlinNoContextSourceAssignment", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\n"
           "fun edit(c: EventContext) { c.source = \"resource.urlconnection\" }", False)
@@ -469,7 +547,7 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
               False)
 
     for name in ("RumEvent", "CustomEvent", "ResourceEvent", "ResourceSuccess", "ViewEvent", "ActionEvent",
-                 "ApplicationEvent",
+                 "ApplicationEvent", "ExceptionEvent",
                  "EventContext", "EventInterceptor"):
         result = subprocess.run(["javap", "-public", "-classpath", classpath,
                                  "com.alibabacloud.rum.event." + name], capture_output=True, text=True, check=True)

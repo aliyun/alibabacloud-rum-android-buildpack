@@ -1,6 +1,6 @@
 # Android RUM buildpack
 
-公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、View、Action、手动 Resource、OkHttp2 与 URLConnection Resource 的统一加工接口位于
+公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、View、Action、普通/手动 Exception、手动 Resource、OkHttp2 与 URLConnection Resource 的统一加工接口位于
 `com.alibabacloud.rum.event`，用法与生命周期、候选提交、只读属性及上下文借用约束见工作区的
 [EventInterceptor 接入说明](../docs/android/event-interceptor.md) 和各公开类型的 Javadoc。
 
@@ -167,6 +167,60 @@ SDK 在真实完成点的当前线程同步执行规则，不切换主线程补�
 不要在 interceptor 中调用 `setCustomEvent`、`setCustomLog`、`setCustomMetric`、`setCustomException`、
 `reportCustomResource` 等会生成业务事件的 API；规则内部可以读取数据、使用专用 setter 或注册、替换、清除 interceptor。
 
+## 普通与手动 Exception 加工
+
+通过 `ExceptionEvent` 识别已接入的普通与手动原生异常。公开手动入口保持原签名：
+`AlibabaCloudRum.setCustomException(Throwable)` 和 `setCustomException(String type, String caseBy, String message)`，
+其 `source` 为 `exception.manual`。既有普通原生异常处理入口使用 `exception.native`。
+字符串入口没有原始 `Throwable`，仍正常加工；SDK 不为补齐上下文制造异常对象。
+Java fatal、Native crash、ANR 恢复来源尚未随本类型启用，不能由类型存在推断其已接入。
+
+```java
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ExceptionEvent;
+
+AlibabaCloudRum.setEventInterceptor((event, context) -> {
+    if (event instanceof ExceptionEvent) {
+        ExceptionEvent exception = (ExceptionEvent) event;
+        Throwable original = context.getNativeObject("exception", Throwable.class);
+        exception.setName("checkout.failure");
+        exception.setMessage("business rule declined");
+        exception.setCausedBy("checkout validation");
+        exception.setSnapshots("business state: declined");
+    }
+    return event;
+});
+```
+
+四个可空的 `String` getter 为 `getName()`、`getMessage()`、`getCausedBy()`、`getSnapshots()`。
+对应 setter 返回 `boolean`，仅修改 `exception.name`、`exception.message`、`exception.caused_by`、
+`exception.snapshots`。`setMessage` 不顺带改写 causedBy 或堆栈；修改其中一处不保证其它只读字段中没有原文。
+异常类型、堆栈、binary images、线程、公共上下文、View/Session 关联、采样及身份全部只读。
+
+获准字段缺失时允许补充。所有文本接受空串、纯空白与非 JSON 字符串，不 trim；snapshots 整串替换，不合并、不解析、
+不新增长度限制、不重跑 Provider。`null` 返回 `false`，本次调用不改变字段，不删除，也不丢失此前成功修改。
+必须返回本次传入的同一个 `event` 才提交；返回 `null` 合法丢弃本份业务输出，回调异常或返回其它实例时整体回退。
+回调结束后，保留的候选不能继续修改已确定的最终事件。SDK 自监控使用拦截前的原始异常与归因，不受业务修改或 drop 影响。
+
+`context.getNativeObject("exception", Throwable.class)` 仅提供当前入口确实持有的原始异常；
+`getNativeObject("originalParameters", java.util.Map.class)` 提供只读原参数容器，与候选编辑独立。
+
+| 立即处理入口 | source | originalParameters 的键 |
+| --- | --- | --- |
+| `setCustomException(Throwable)` | `exception.manual` | `exception`，即原始 Throwable，与原生槽为同一个对象 |
+| `setCustomException(String, String, String)` | `exception.manual` | `type`、`crashName`、`crashMessage`，对应公开参数 `type`、`caseBy`、`message` |
+| 既有普通 `reportException` | `exception.native` | `type`、`subType`、`causedBy`、`stacktrace` |
+| 既有普通 `reportError` | `exception.native` | `name`、`subType`、`message`、`stacktrace`、`source`、`file`、`line`、`column` |
+
+原参数保留 null、空白与原数值，不随生产字段默认处理或候选编辑改变。普通两个入口没有额外 Throwable 对象，
+不提供 `error` 槽。启动缓冲继续只保存既有事件字段，不为 interceptor 强留原参数或 Throwable；
+缓冲 drain 时这两个槽均可空，仍正常加工。`reportException` / `reportError` 在此说明既有内部原生来源，
+不新增同名的 buildpack 公开入口。
+
+缺失、类型不匹配或回调结束后访问返回 `null`。原生对象与原参数仅在同步回调期借用，不得改写、保留或跨线程使用，
+不自动写入业务事件或导出。回调在实际处理或缓冲 drain 的当前线程同步执行，多个事件可并发进入；规则须快速、线程安全且无阻塞。
+不要在规则内调用 `setCustomException` 等生成业务事件的 API；注册、替换与清除规则沿用动态注册契约。
+
 ## 验证公开产物
 
 先将本轮内部 SDK 的 `:alibabacloud-rum-android-sdk:assembleDistribute` 产物放到
@@ -178,16 +232,17 @@ python3 scripts/verify-event-api.py \
   alibabacloud-android-rum-sdk/build/outputs/aar/alibabacloud-android-rum-sdk-release.aar --okhttp2
 ```
 
-脚本从指定 AAR 提取实际类，验证 Java/Kotlin SAM、Custom/Resource/View/Action 可空读取、64 位成对结果、boolean setter，
+脚本从指定 AAR 提取实际类，验证 Java/Kotlin SAM、Custom/Resource/View/Action/Exception 可空读取、64 位成对结果、boolean setter，
 以及 JDK 原生 URLConnection 四槽的类型安全读取；验证构造、克隆、通用写入、独立结果 setter、URL 改写、
 context 写入及错误原生类型赋值等负例，并检查公开签名没有泄漏内部事件模型。
-consumer rules 保留公开事件类型（含 ActionEvent）和三态枚举。证据记录 AAR 的 SHA-256，默认保存在
+Exception 专项还验证四个可空 getter、原生 Throwable 的类型安全读取，以及构造、继承、clone、堆栈/类型改写、删除等负例。
+consumer rules 保留公开事件类型（含 ExceptionEvent）和三态枚举。证据记录 AAR 的 SHA-256，默认保存在
 `~/tmp/`。需要 JDK，以及本机 Gradle 缓存中的 Kotlin 1.9.22 编译器及其运行依赖；缺少依赖时
 明确失败。`--output` 可指定证据目录，`--kotlin-version` 可指定已缓存的兼容编译器版本。
 `--okhttp2` 额外使用缓存的 OkHttp 2.7.5 编译 Java/Kotlin 原生 request/response/error 读取样例，
 不改变公共 API 的基础依赖。
 
-消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2/URLConnection/View/Action 场景或最终导出验证。发布链必须使用本轮 SDK →
+消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2/URLConnection/View/Action/Exception 场景或最终导出验证。发布链必须使用本轮 SDK →
 buildpack → 宿主产物，不以源码接缝测试或旧 AAR 代替。
 
 模块 `build.gradle` 将内嵌 SDK AAR 的 SHA-256 登记为 TransformR 输入，避免 fat-aar 1.3.8
