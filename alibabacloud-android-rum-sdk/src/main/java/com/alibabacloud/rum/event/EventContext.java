@@ -29,6 +29,11 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
  * 恢复不提供前一进程的 Throwable，exception 和 originalParameters 槽均为空。
  * 回调读取实际调用时的当前注册；已保存的最终处理结果复用且不再次回调，只有原始记录时重新形成事件。
  * 修改业务异常输出不改变 SDK 自监控使用的原始异常归因。
+ * view.replay 在 records 上传成功后、metadata 提交点的当前线程提供 recoveredRecord（只读 Map）槽：
+ * timestamp、view.records_end、view.records_count、view.has_full_snapshot、session.id、view.id、view.name。
+ * 这些是录制文件中已有的原 metadata，缺失字段可空；候选修改不会改写它或追溯已保存 Replay 的名称。
+ * 不提供 Activity、request、response 或二进制 body，不主动读取 headers/body；originalParameters 为空。
+ * Replay metadata 仍为 ViewEvent，空返回回退原 metadata 并正常提交；已固定结果重试不重复回调。
  * longtask.watchdog 在 RUM-Longtask-WatchDog 线程提供 longtaskInfo（原生诊断对象）与
  * threadBeans（既有线程诊断数组）槽，可通过 Object.class 借用；不要求导入内部类型。
  * 原始对象仅供当前回调观察，不得修改、跨线程保留或操作 UI；不向阻塞主线程投递回调。

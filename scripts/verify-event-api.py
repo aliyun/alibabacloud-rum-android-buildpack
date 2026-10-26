@@ -55,6 +55,7 @@ def main():
                 "exception_sources": ["exception.manual", "exception.native", "exception.java.recovered",
                                       "exception.native.recovered", "exception.anr.recovered"],
                 "longtask_sources": ["longtask.watchdog"],
+                "replay_sources": ["view.replay"],
                 "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
                 "checks": []}
 
@@ -163,6 +164,52 @@ fun register(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context -
     event
 }
 fun clear(): Boolean = AlibabaCloudRum.setEventInterceptor(null)
+""")
+    check("JavaReplayViewConsumer", "java", """
+import java.util.Map;
+
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ViewEvent;
+final class JavaReplayViewConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ViewEvent && "view.replay".equals(context.getSource())) {
+                ViewEvent replay = (ViewEvent) event;
+                String name = replay.getName(), snapshots = replay.getSnapshots();
+                Object subtype = replay.getAttribute("view.type");
+                Object count = replay.getAttribute("view.records_count");
+                Object recordsEnd = replay.getAttribute("view.records_end");
+                Map<?, ?> record = context.getNativeObject("recoveredRecord", Map.class);
+                if (record != null) {
+                    Long timestamp = (Long) record.get("timestamp");
+                    String originalName = (String) record.get("view.name");
+                }
+                if (!replay.setName("checkout.replay") || !replay.setSnapshots("not JSON")) return event;
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinReplayViewConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ViewEvent
+fun registerReplayView(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ViewEvent && context.source == "view.replay") {
+        val name: String? = event.name
+        val snapshots: String? = event.snapshots
+        val subtype: Any? = event.getAttribute("view.type")
+        val count: Any? = event.getAttribute("view.records_count")
+        val recordsEnd: Any? = event.getAttribute("view.records_end")
+        val record: Map<*, *>? = context.getNativeObject("recoveredRecord", Map::class.java)
+        val timestamp: Long? = record?.get("timestamp") as? Long
+        val originalName: String? = record?.get("view.name") as? String
+        if (!event.setName("checkout.replay") || !event.setSnapshots("not JSON")) {
+            return@setEventInterceptor event
+        }
+    }
+    event
+}
 """)
     check("JavaActionConsumer", "java", """
 import com.alibabacloud.rum.AlibabaCloudRum;
@@ -572,6 +619,16 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         "NoViewRemove": "class NoViewRemove { void edit(ViewEvent e) { e.removeAttribute(\"view.name\"); } }",
         "NoViewClear": "class NoViewClear { void edit(ViewEvent e) { e.clearSnapshots(); } }",
         "NoViewSpanAccessor": "class NoViewSpanAccessor { Object raw(ViewEvent e) { return e.getSpan(); } }",
+        "NoReplayTypeSetter": "class NoReplayTypeSetter { void edit(ViewEvent e) { e.setType(\"view\"); } }",
+        "NoReplayRecordsCountSetter": "class NoReplayRecordsCountSetter {"
+                                     " void edit(ViewEvent e) { e.setRecordsCount(1); } }",
+        "NoReplayRecordsEndSetter": "class NoReplayRecordsEndSetter {"
+                                   " void edit(ViewEvent e) { e.setRecordsEnd(123L); } }",
+        "NoReplayFullSnapshotSetter": "class NoReplayFullSnapshotSetter {"
+                                     " void edit(ViewEvent e) { e.setHasFullSnapshot(0); } }",
+        "NoReplaySeparateEvent": "class NoReplaySeparateEvent { ReplayEvent value; }",
+        "NoReplayRecordSetter": "class NoReplayRecordSetter { void edit(EventContext c) {"
+                                " c.setNativeObject(\"recoveredRecord\", null); } }",
         "NoActionConstruct": "class NoActionConstruct { Object create() { return new ActionEvent(null); } }",
         "NoActionSubclass": "class NoActionSubclass extends ActionEvent { NoActionSubclass() { super(null); } }",
         "NoActionClone": "class NoActionClone { Object copy(ActionEvent e) { return e.clone(); } }",
@@ -708,6 +765,14 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
               f"fun edit(e: ViewEvent) {{ e.{getter} = \"x\" }}", False)
     check("KotlinNoContextConstruct", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\nfun create() = EventContext(null)", False)
+    check("KotlinNoReplayTypeSetter", "kotlin",
+          "import com.alibabacloud.rum.event.ViewEvent\n"
+          "fun edit(e: ViewEvent) { e.setType(\"view\") }", False)
+    check("KotlinNoReplayRecordsCountSetter", "kotlin",
+          "import com.alibabacloud.rum.event.ViewEvent\n"
+          "fun edit(e: ViewEvent) { e.setRecordsCount(1) }", False)
+    check("KotlinNoReplaySeparateEvent", "kotlin",
+          "import com.alibabacloud.rum.event.ReplayEvent\nfun value(e: ReplayEvent) = e", False)
     check("KotlinNoActionConstruct", "kotlin",
           "import com.alibabacloud.rum.event.ActionEvent\nfun create() = ActionEvent(null)", False)
     for getter in ("name", "snapshots"):
