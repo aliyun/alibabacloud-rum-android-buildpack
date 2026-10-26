@@ -14,7 +14,12 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
  * 普通 reportException 原参数为 type、subType、causedBy、stacktrace；reportError 为
  * name、subType、message、stacktrace、source、file、line、column，保留原值而不随候选修改。
  * 既有启动缓冲仅保存事件字段，drain 时两槽均可空；SDK 不为 interceptor 额外持有原参数或 Throwable。
- * 修改业务异常输出不改变 SDK 自监控使用的原始异常归因；fatal/native/ANR 恢复来源未在本类型首批接入。
+ * exception.java.recovered 在下次启动读取 Java fatal 记录的安全点提供 recoveredRecord（只读 Map）槽；
+ * 其中为已有缓存原始字段，例如 exceptionType、exceptionMessage、exceptionStacktrace、timestamp、
+ * threadId、threadName、sessionId、viewId、viewName、rumSampled，旧记录的字段可缺失。
+ * 恢复不提供前一进程的 Throwable，exception 和 originalParameters 槽均为空。
+ * 回调读取实际调用时的当前注册；已保存的最终处理结果复用且不再次回调，只有原始记录时重新形成事件。
+ * 修改业务异常输出不改变 SDK 自监控使用的原始异常归因；Native crash、ANR 恢复来源另行接入。
  * action.native 按实际入口提供可空 targetView（View）、dialog（Dialog）、menuItem（MenuItem）、
  * motionEvent（MotionEvent）、keyEvent（KeyEvent）槽；originalParameters 为 actionName、actionType 等
  * 当前入口已有的标量参数 Map。手势完成时 motionEvent 是既有生命周期内的 UP/CANCEL 副本。

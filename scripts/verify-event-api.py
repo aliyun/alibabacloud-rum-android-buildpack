@@ -52,7 +52,7 @@ def main():
     evidence = {"aar": str(args.aar.resolve()), "sha256": hashlib.sha256(args.aar.read_bytes()).hexdigest(),
                 "kotlin_version": args.kotlin_version,
                 "application_sources": ["application.start", "application.state"],
-                "exception_sources": ["exception.manual", "exception.native"],
+                "exception_sources": ["exception.manual", "exception.native", "exception.java.recovered"],
                 "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
                 "checks": []}
 
@@ -277,6 +277,46 @@ fun registerException(): Boolean = AlibabaCloudRum.setEventInterceptor { event, 
     event
 }
 """)
+    check("JavaRecoveredExceptionConsumer", "java", """
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ExceptionEvent;
+import java.util.Map;
+final class JavaRecoveredExceptionConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ExceptionEvent && "exception.java.recovered".equals(context.getSource())) {
+                Map<?, ?> record = context.getNativeObject("recoveredRecord", Map.class);
+                Throwable unavailable = context.getNativeObject("exception", Throwable.class);
+                if (record != null && "checkout failed".equals(record.get("exceptionMessage"))) {
+                    ExceptionEvent exception = (ExceptionEvent) event;
+                    if (!exception.setName("checkout.failure") || !exception.setMessage("payment failed")
+                        || !exception.setCausedBy("checkout validation") || !exception.setSnapshots("not JSON")) {
+                        return null;
+                    }
+                }
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinRecoveredExceptionConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ExceptionEvent
+fun registerRecoveredException(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ExceptionEvent && context.source == "exception.java.recovered") {
+        val record: Map<*, *>? = context.getNativeObject("recoveredRecord", Map::class.java)
+        val unavailable: Throwable? = context.getNativeObject("exception", Throwable::class.java)
+        if (record?.get("exceptionMessage") == "checkout failed") {
+            if (!event.setName("checkout.failure") || !event.setMessage("payment failed")
+                || !event.setCausedBy("checkout validation") || !event.setSnapshots("not JSON")) {
+                return@setEventInterceptor null
+            }
+        }
+    }
+    event
+}
+""")
     check("JavaURLConnectionConsumer", "java", """
 import com.alibabacloud.rum.AlibabaCloudRum;
 import com.alibabacloud.rum.event.ResourceEvent;
@@ -457,6 +497,9 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         "NoMismatchedExceptionType": "class NoMismatchedExceptionType { void read(EventContext c) {"
                                      " java.io.IOException value ="
                                      " c.getNativeObject(\"exception\", Throwable.class); } }",
+        "NoMismatchedRecoveredRecordType": "class NoMismatchedRecoveredRecordType { void read(EventContext c) {"
+                                          " Throwable value = c.getNativeObject(\"recoveredRecord\", java.util.Map.class);"
+                                          " } }",
         "NoBaseNameSetter": "class NoBaseNameSetter { void edit(RumEvent e) { e.setName(\"x\"); } }",
         "NoBaseSnapshotsSetter": "class NoBaseSnapshotsSetter { void edit(RumEvent e) { e.setSnapshots(\"x\"); } }",
         "NoContextConstruct": "class NoContextConstruct { Object create() { return new EventContext(null); } }",
@@ -534,6 +577,12 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
     check("KotlinExceptionNullableObject", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\n"
           "fun value(c: EventContext): Throwable = c.getNativeObject(\"exception\", Throwable::class.java)", False)
+    check("KotlinRecoveredRecordNullable", "kotlin",
+          "import com.alibabacloud.rum.event.EventContext\n"
+          "fun value(c: EventContext): Map<*, *> = c.getNativeObject(\"recoveredRecord\", Map::class.java)", False)
+    check("KotlinRecoveredRecordTypeMismatch", "kotlin",
+          "import com.alibabacloud.rum.event.EventContext\n"
+          "fun value(c: EventContext): Throwable? = c.getNativeObject(\"recoveredRecord\", Map::class.java)", False)
     check("KotlinNoContextSourceAssignment", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\n"
           "fun edit(c: EventContext) { c.source = \"resource.urlconnection\" }", False)
