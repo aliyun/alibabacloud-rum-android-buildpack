@@ -43,14 +43,16 @@ dependencies {
 
 // fat-aar 1.3.8 copies embedded classes into javac output after AGP records its incremental inputs.
 // A changed AAR can otherwise leave new classes out of TransformR and the final runtime/release JAR.
-// A value input forces a complete transform only when the embedded binary content changes.
+// The consumer merge also misses changed embedded rules in its incremental inputs.
+// A value input refreshes classes and consumer rules when the embedded binary content changes.
 def embeddedSdkAar = rootProject.file(
     'alibabacloud-rum-android-sdk/alibabacloud-rum-android-sdk-distribute.aar')
 def embeddedSdkDigest = providers.provider {
     java.security.MessageDigest.getInstance('SHA-256').digest(embeddedSdkAar.bytes).encodeHex().toString()
 }
 tasks.configureEach { task ->
-    if (task.name.startsWith('transformClassesWithTransformRFor')) {
+    if (task.name.startsWith('transformClassesWithTransformRFor')
+            || task.name.matches('merge.*ConsumerProguardFiles')) {
         task.inputs.property('embeddedSdkSha256', embeddedSdkDigest)
     }
 }

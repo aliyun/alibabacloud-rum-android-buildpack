@@ -21,9 +21,14 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
  * crashType、subCrashType、crashReason、crashAddress（Long）、assertion、requestingThread（Integer）、
  * timeDateStamp、processCreateTime（Long，秒）、threads，以及只读 binaryImages Map 和 stackTraces List<Map>。
  * 字符串和嵌套字段保持记录原表示；缺失字段可空，不需要导入内部 NativeCrashInfo 类型。
+ * exception.anr.recovered 在下次启动的正常恢复线程提供原始 ANR JSON 的只读 recoveredRecord Map：
+ * timestamp、processName、pid、threadDump、cpuInfo、memoryInfo、name、message、cause、snapshots、
+ * sessionId、viewId、viewName、userId、userName、userTags、properties、netIp、netType、viewSampled、
+ * moduleSampled、eventContext、binaryImages、inForeground 按记录实际存在提供，嵌套 eventContext 也只读。
+ * 不提供内部持久化终结状态；缺失字段可空，不需要导入内部 ANRInfo，也不在 ANR 检测现场调用规则。
  * 恢复不提供前一进程的 Throwable，exception 和 originalParameters 槽均为空。
  * 回调读取实际调用时的当前注册；已保存的最终处理结果复用且不再次回调，只有原始记录时重新形成事件。
- * 修改业务异常输出不改变 SDK 自监控使用的原始异常归因；ANR 恢复来源另行接入。
+ * 修改业务异常输出不改变 SDK 自监控使用的原始异常归因。
  * action.native 按实际入口提供可空 targetView（View）、dialog（Dialog）、menuItem（MenuItem）、
  * motionEvent（MotionEvent）、keyEvent（KeyEvent）槽；originalParameters 为 actionName、actionType 等
  * 当前入口已有的标量参数 Map。手势完成时 motionEvent 是既有生命周期内的 UP/CANCEL 副本。

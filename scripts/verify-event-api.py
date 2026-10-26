@@ -53,7 +53,7 @@ def main():
                 "kotlin_version": args.kotlin_version,
                 "application_sources": ["application.start", "application.state"],
                 "exception_sources": ["exception.manual", "exception.native", "exception.java.recovered",
-                                      "exception.native.recovered"],
+                                      "exception.native.recovered", "exception.anr.recovered"],
                 "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
                 "checks": []}
 
@@ -362,6 +362,55 @@ fun registerNativeCrashRecovery(): Boolean = AlibabaCloudRum.setEventInterceptor
             val frames: List<*>? = record["stackTraces"] as? List<*>
             if (!event.setName("checkout.native") || !event.setMessage("payment failed")
                 || !event.setCausedBy("checkout validation") || !event.setSnapshots("not JSON")) {
+                return@setEventInterceptor null
+            }
+        }
+    }
+    event
+}
+""")
+    check("JavaANRRecoveryConsumer", "java", """
+import java.util.Map;
+
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ExceptionEvent;
+final class JavaANRRecoveryConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ExceptionEvent && "exception.anr.recovered".equals(context.getSource())) {
+                Map<?, ?> record = context.getNativeObject("recoveredRecord", Map.class);
+                Throwable unavailable = context.getNativeObject("exception", Throwable.class);
+                if (record != null && "ApplicationNotResponding".equals(record.get("name"))) {
+                    String threadDump = (String) record.get("threadDump");
+                    Long timestamp = (Long) record.get("timestamp");
+                    Boolean viewSampled = (Boolean) record.get("viewSampled");
+                    Map<?, ?> originalContext = (Map<?, ?>) record.get("eventContext");
+                    ExceptionEvent exception = (ExceptionEvent) event;
+                    if (!exception.setName("checkout.anr") || !exception.setMessage("checkout timeout")
+                        || !exception.setCausedBy("checkout blocked") || !exception.setSnapshots("not JSON")) {
+                        return null;
+                    }
+                }
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinANRRecoveryConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ExceptionEvent
+fun registerANRRecovery(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ExceptionEvent && context.source == "exception.anr.recovered") {
+        val record: Map<*, *>? = context.getNativeObject("recoveredRecord", Map::class.java)
+        val unavailable: Throwable? = context.getNativeObject("exception", Throwable::class.java)
+        if (record?.get("name") == "ApplicationNotResponding") {
+            val threadDump: String? = record["threadDump"] as? String
+            val timestamp: Long? = record["timestamp"] as? Long
+            val viewSampled: Boolean? = record["viewSampled"] as? Boolean
+            val originalContext: Map<*, *>? = record["eventContext"] as? Map<*, *>
+            if (!event.setName("checkout.anr") || !event.setMessage("checkout timeout")
+                || !event.setCausedBy("checkout blocked") || !event.setSnapshots("not JSON")) {
                 return@setEventInterceptor null
             }
         }
