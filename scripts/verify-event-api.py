@@ -54,6 +54,7 @@ def main():
                 "application_sources": ["application.start", "application.state"],
                 "exception_sources": ["exception.manual", "exception.native", "exception.java.recovered",
                                       "exception.native.recovered", "exception.anr.recovered"],
+                "longtask_sources": ["longtask.watchdog"],
                 "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
                 "checks": []}
 
@@ -194,6 +195,40 @@ fun registerAction(): Boolean = AlibabaCloudRum.setEventInterceptor { event, con
         if (!event.setName("checkout.confirmed") || !event.setSnapshots("plain text")) {
             return@setEventInterceptor null
         }
+    }
+    event
+}
+""")
+    check("JavaLongTaskConsumer", "java", """
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.LongTaskEvent;
+final class JavaLongTaskConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof LongTaskEvent && "longtask.watchdog".equals(context.getSource())) {
+                LongTaskEvent longTask = (LongTaskEvent) event;
+                String message = longTask.getMessage(), snapshots = longTask.getSnapshots();
+                Object stack = longTask.getAttribute("longtask.stack");
+                Object diagnostic = context.getNativeObject("longtaskInfo", Object.class);
+                Object[] threadBeans = context.getNativeObject("threadBeans", Object[].class);
+                if (!longTask.setMessage("") || !longTask.setSnapshots("not JSON")) return null;
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinLongTaskConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.LongTaskEvent
+fun registerLongTask(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is LongTaskEvent && context.source == "longtask.watchdog") {
+        val message: String? = event.message
+        val snapshots: String? = event.snapshots
+        val stack: Any? = event.getAttribute("longtask.stack")
+        val diagnostic: Any? = context.getNativeObject("longtaskInfo", Any::class.java)
+        val threadBeans: Array<Any>? = context.getNativeObject("threadBeans", Array<Any>::class.java)
+        if (!event.setMessage(" ") || !event.setSnapshots("not JSON")) return@setEventInterceptor null
     }
     event
 }
@@ -601,6 +636,26 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         "NoMismatchedRecoveredRecordType": "class NoMismatchedRecoveredRecordType { void read(EventContext c) {"
                                           " Throwable value = c.getNativeObject(\"recoveredRecord\", java.util.Map.class);"
                                           " } }",
+        "NoLongTaskConstruct": "class NoLongTaskConstruct { Object create() { return new LongTaskEvent(null); } }",
+        "NoLongTaskSubclass": "class NoLongTaskSubclass extends LongTaskEvent {"
+                              " NoLongTaskSubclass() { super(null); } }",
+        "NoLongTaskClone": "class NoLongTaskClone { Object copy(LongTaskEvent e) { return e.clone(); } }",
+        "NoLongTaskNameSetter": "class NoLongTaskNameSetter { void edit(LongTaskEvent e) { e.setName(\"x\"); } }",
+        "NoLongTaskIdSetter": "class NoLongTaskIdSetter { void edit(LongTaskEvent e) { e.setId(\"x\"); } }",
+        "NoLongTaskTypeSetter": "class NoLongTaskTypeSetter { void edit(LongTaskEvent e) { e.setType(\"x\"); } }",
+        "NoLongTaskDurationSetter": "class NoLongTaskDurationSetter {"
+                                    " void edit(LongTaskEvent e) { e.setDuration(1L); } }",
+        "NoLongTaskStackSetter": "class NoLongTaskStackSetter {"
+                                 " void edit(LongTaskEvent e) { e.setStack(\"x\"); } }",
+        "NoLongTaskGenericWrite": "class NoLongTaskGenericWrite { void edit(LongTaskEvent e) {"
+                                  " e.setAttribute(\"longtask.source\", \"x\"); } }",
+        "NoLongTaskRemove": "class NoLongTaskRemove {"
+                            " void edit(LongTaskEvent e) { e.removeAttribute(\"longtask.message\"); } }",
+        "NoLongTaskClear": "class NoLongTaskClear { void edit(LongTaskEvent e) { e.clearSnapshots(); } }",
+        "NoLongTaskSpanAccessor": "class NoLongTaskSpanAccessor {"
+                                  " Object raw(LongTaskEvent e) { return e.getSpan(); } }",
+        "NoLongTaskDiagnosticSetter": "class NoLongTaskDiagnosticSetter { void edit(EventContext c) {"
+                                      " c.setNativeObject(\"longtaskInfo\", new Object()); } }",
         "NoBaseNameSetter": "class NoBaseNameSetter { void edit(RumEvent e) { e.setName(\"x\"); } }",
         "NoBaseSnapshotsSetter": "class NoBaseSnapshotsSetter { void edit(RumEvent e) { e.setSnapshots(\"x\"); } }",
         "NoContextConstruct": "class NoContextConstruct { Object create() { return new EventContext(null); } }",
@@ -680,6 +735,19 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         check("KotlinExceptionBoolean" + suffix + "Setter", "kotlin",
               "import com.alibabacloud.rum.event.ExceptionEvent\n"
               f"fun edit(e: ExceptionEvent) {{ e.{getter} = \"x\" }}", False)
+    check("KotlinNoLongTaskConstruct", "kotlin",
+          "import com.alibabacloud.rum.event.LongTaskEvent\nfun create() = LongTaskEvent(null)", False)
+    for getter in ("message", "snapshots"):
+        suffix = getter[0].upper() + getter[1:]
+        check("KotlinLongTaskNullable" + suffix, "kotlin",
+              "import com.alibabacloud.rum.event.LongTaskEvent\n"
+              f"fun value(e: LongTaskEvent): String = e.{getter}", False)
+        check("KotlinLongTaskBoolean" + suffix + "Setter", "kotlin",
+              "import com.alibabacloud.rum.event.LongTaskEvent\n"
+              f"fun edit(e: LongTaskEvent) {{ e.{getter} = \"x\" }}", False)
+    check("KotlinLongTaskNullableDiagnostic", "kotlin",
+          "import com.alibabacloud.rum.event.EventContext\n"
+          "fun value(c: EventContext): Any = c.getNativeObject(\"longtaskInfo\", Any::class.java)", False)
     check("KotlinExceptionNullableObject", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\n"
           "fun value(c: EventContext): Throwable = c.getNativeObject(\"exception\", Throwable::class.java)", False)
@@ -706,7 +774,7 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
               False)
 
     for name in ("RumEvent", "CustomEvent", "ResourceEvent", "ResourceSuccess", "ViewEvent", "ActionEvent",
-                 "ApplicationEvent", "ExceptionEvent",
+                 "ApplicationEvent", "ExceptionEvent", "LongTaskEvent",
                  "EventContext", "EventInterceptor"):
         result = subprocess.run(["javap", "-public", "-classpath", classpath,
                                  "com.alibabacloud.rum.event." + name], capture_output=True, text=True, check=True)

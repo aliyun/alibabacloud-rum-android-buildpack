@@ -31,6 +31,8 @@ public final class EventInterceptorAdapter {
                     event = new ApplicationEvent(candidate);
                 } else if ("exception".equals(candidate.getEventType())) {
                     event = new ExceptionEvent(candidate);
+                } else if ("longTask".equals(candidate.getEventType())) {
+                    event = new LongTaskEvent(candidate);
                 } else {
                     return EventInterceptorRegistry.invalidCandidate();
                 }

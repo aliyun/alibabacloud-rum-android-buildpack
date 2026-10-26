@@ -29,6 +29,10 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
  * 恢复不提供前一进程的 Throwable，exception 和 originalParameters 槽均为空。
  * 回调读取实际调用时的当前注册；已保存的最终处理结果复用且不再次回调，只有原始记录时重新形成事件。
  * 修改业务异常输出不改变 SDK 自监控使用的原始异常归因。
+ * longtask.watchdog 在 RUM-Longtask-WatchDog 线程提供 longtaskInfo（原生诊断对象）与
+ * threadBeans（既有线程诊断数组）槽，可通过 Object.class 借用；不要求导入内部类型。
+ * 原始对象仅供当前回调观察，不得修改、跨线程保留或操作 UI；不向阻塞主线程投递回调。
+ * 两槽在回调返回后失效，不随事件进入异步导出。
  * action.native 按实际入口提供可空 targetView（View）、dialog（Dialog）、menuItem（MenuItem）、
  * motionEvent（MotionEvent）、keyEvent（KeyEvent）槽；originalParameters 为 actionName、actionType 等
  * 当前入口已有的标量参数 Map。手势完成时 motionEvent 是既有生命周期内的 UP/CANCEL 副本。
