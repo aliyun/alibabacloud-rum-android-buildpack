@@ -1,6 +1,6 @@
 # Android RUM buildpack
 
-公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、View、Action、普通/手动 Exception、Java fatal 恢复、手动 Resource、OkHttp2 与 URLConnection Resource 的统一加工接口位于
+公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、View、Action、普通/手动 Exception、Java fatal / Native crash 恢复、手动 Resource、OkHttp2 与 URLConnection Resource 的统一加工接口位于
 `com.alibabacloud.rum.event`，用法与生命周期、候选提交、只读属性及上下文借用约束见工作区的
 [EventInterceptor 接入说明](../docs/android/event-interceptor.md) 和各公开类型的 Javadoc。
 
@@ -173,8 +173,8 @@ SDK 在真实完成点的当前线程同步执行规则，不切换主线程补�
 `AlibabaCloudRum.setCustomException(Throwable)` 和 `setCustomException(String type, String caseBy, String message)`，
 其 `source` 为 `exception.manual`。既有普通原生异常处理入口使用 `exception.native`。
 字符串入口没有原始 `Throwable`，仍正常加工；SDK 不为补齐上下文制造异常对象。
-Java fatal 仅在下次启动的安全恢复点接入，不在致命异常 handler 调用用户代码；
-Native crash、ANR 恢复来源另行接入，不能由类型存在推断其已接入。
+Java fatal 与 Native crash 仅在下次启动的安全恢复点接入，不在致命异常或 signal handler 调用用户代码；
+ANR 恢复来源另行接入，不能由类型存在推断其已接入。
 
 ```java
 import com.alibabacloud.rum.AlibabaCloudRum;
@@ -258,6 +258,44 @@ AlibabaCloudRum.setEventInterceptor((event, context) -> {
 前一会话/页面关联、采样或崩溃时间。已保存的最终结果在重试/恢复时复用，不再次调用用户规则；
 故障后若只剩原始诊断记录，重建事件会使用当时当前规则，不承诺用户副作用跨进程全局恰好一次。
 
+### Native crash 安全恢复
+
+Native signal handler 继续按原链保存 minidump，不调用用户规则。下次启动在正常解析和恢复线程形成业务
+Exception 后，以 `exception.native.recovered` 同步读取当前注册。与 Java fatal 一样，
+`context.getNativeObject("recoveredRecord", Map.class)` 仅在回调期间借用现有记录的只读表示，
+`exception` 与 `originalParameters` 槽为空；不要导入内部 `NativeCrashInfo` 类型。
+
+| 记录字段 | 读取表示 |
+| --- | --- |
+| `crashType`、`subCrashType`、`crashReason`、`assertion`、`threads` | `String`，保留记录原表示，可空 |
+| `crashAddress` | `Long`，原始崩溃地址 |
+| `requestingThread` | `Integer`，minidump 中的原始请求线程索引 |
+| `timeDateStamp`、`processCreateTime` | `Long`，原记录秒值 |
+| `binaryImages` | 只读 `Map<String, String>`，已有 so 名称到 Build ID 的映射 |
+| `stackTraces` | 只读 `List<Map<String, String>>`，内层容器同样只读 |
+
+字段未恢复时按原表示为空或缺失；SDK 不为此重新读取文件、回补活对象或自动将记录写入事件。
+候选的四组专用字段读写与普通 Exception 相同，读取原诊断与编辑候选相互隔离：
+
+```java
+AlibabaCloudRum.setEventInterceptor((event, context) -> {
+    if (event instanceof ExceptionEvent && "exception.native.recovered".equals(context.getSource())) {
+        Map<?, ?> record = context.getNativeObject("recoveredRecord", Map.class);
+        if (record != null && "SIGSEGV / SEGV_MAPERR".equals(record.get("crashReason"))) {
+            ExceptionEvent exception = (ExceptionEvent) event;
+            exception.setName("checkout.native");
+            exception.setSnapshots("checkout state: submitting");
+        }
+    }
+    return event;
+});
+```
+
+未注册保留默认事件，合法 `null` 丢弃本份输出并推进原恢复去重和清理；回调异常或错误候选回退原始事件。
+已保存 final 的提交重试复用结果，删除失败不重复生产业务事件；故障后只有原始记录时，重新形成事件可按当时规则加工。
+原 handler、崩溃时间、历史 Session/View、采样与原始自监控归因保持原契约。要覆盖最早恢复记录，应在启动 SDK 前注册；
+较晚设置不会追溯已处理快照。不要在 interceptor 内调用生成业务事件的 SDK API。
+
 ## 验证公开产物
 
 先将本轮内部 SDK 的 `:alibabacloud-rum-android-sdk:assembleDistribute` 产物放到
@@ -272,8 +310,8 @@ python3 scripts/verify-event-api.py \
 脚本从指定 AAR 提取实际类，验证 Java/Kotlin SAM、Custom/Resource/View/Action/Exception 可空读取、64 位成对结果、boolean setter，
 以及 JDK 原生 URLConnection 四槽的类型安全读取；验证构造、克隆、通用写入、独立结果 setter、URL 改写、
 context 写入及错误原生类型赋值等负例，并检查公开签名没有泄漏内部事件模型。
-Exception 专项还验证四个可空 getter、原生 Throwable 和 Java fatal recoveredRecord 的类型安全读取，
-以及构造、继承、clone、堆栈/类型改写、删除、恢复记录错误类型及非空误用等负例。
+Exception 专项还验证四个可空 getter、原生 Throwable，以及 Java fatal / Native crash recoveredRecord 的类型安全读取，
+以及构造、继承、clone、堆栈/类型改写、删除、恢复记录错误类型、非空误用和 Map 结果误当内部记录类型等负例。
 consumer rules 保留公开事件类型（含 ExceptionEvent）和三态枚举。证据记录 AAR 的 SHA-256，默认保存在
 `~/tmp/`。需要 JDK，以及本机 Gradle 缓存中的 Kotlin 1.9.22 编译器及其运行依赖；缺少依赖时
 明确失败。`--output` 可指定证据目录，`--kotlin-version` 可指定已缓存的兼容编译器版本。

@@ -52,7 +52,8 @@ def main():
     evidence = {"aar": str(args.aar.resolve()), "sha256": hashlib.sha256(args.aar.read_bytes()).hexdigest(),
                 "kotlin_version": args.kotlin_version,
                 "application_sources": ["application.start", "application.state"],
-                "exception_sources": ["exception.manual", "exception.native", "exception.java.recovered"],
+                "exception_sources": ["exception.manual", "exception.native", "exception.java.recovered",
+                                      "exception.native.recovered"],
                 "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
                 "checks": []}
 
@@ -317,6 +318,57 @@ fun registerRecoveredException(): Boolean = AlibabaCloudRum.setEventInterceptor 
     event
 }
 """)
+    check("JavaNativeCrashRecoveryConsumer", "java", """
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ExceptionEvent;
+import java.util.List;
+import java.util.Map;
+final class JavaNativeCrashRecoveryConsumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ExceptionEvent && "exception.native.recovered".equals(context.getSource())) {
+                Map<?, ?> record = context.getNativeObject("recoveredRecord", Map.class);
+                Throwable unavailable = context.getNativeObject("exception", Throwable.class);
+                if (record != null && "SIGSEGV / SEGV_MAPERR".equals(record.get("crashReason"))) {
+                    Long address = (Long) record.get("crashAddress");
+                    Integer requestingThread = (Integer) record.get("requestingThread");
+                    Long capturedSeconds = (Long) record.get("timeDateStamp");
+                    Map<?, ?> images = (Map<?, ?>) record.get("binaryImages");
+                    List<?> frames = (List<?>) record.get("stackTraces");
+                    ExceptionEvent exception = (ExceptionEvent) event;
+                    if (!exception.setName("checkout.native") || !exception.setMessage("payment failed")
+                        || !exception.setCausedBy("checkout validation") || !exception.setSnapshots("not JSON")) {
+                        return null;
+                    }
+                }
+            }
+            return event;
+        });
+    }
+}
+""")
+    check("KotlinNativeCrashRecoveryConsumer", "kotlin", """
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ExceptionEvent
+fun registerNativeCrashRecovery(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ExceptionEvent && context.source == "exception.native.recovered") {
+        val record: Map<*, *>? = context.getNativeObject("recoveredRecord", Map::class.java)
+        val unavailable: Throwable? = context.getNativeObject("exception", Throwable::class.java)
+        if (record?.get("crashReason") == "SIGSEGV / SEGV_MAPERR") {
+            val address: Long? = record["crashAddress"] as? Long
+            val requestingThread: Int? = record["requestingThread"] as? Int
+            val capturedSeconds: Long? = record["timeDateStamp"] as? Long
+            val images: Map<*, *>? = record["binaryImages"] as? Map<*, *>
+            val frames: List<*>? = record["stackTraces"] as? List<*>
+            if (!event.setName("checkout.native") || !event.setMessage("payment failed")
+                || !event.setCausedBy("checkout validation") || !event.setSnapshots("not JSON")) {
+                return@setEventInterceptor null
+            }
+        }
+    }
+    event
+}
+""")
     check("JavaURLConnectionConsumer", "java", """
 import com.alibabacloud.rum.AlibabaCloudRum;
 import com.alibabacloud.rum.event.ResourceEvent;
@@ -515,6 +567,11 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
     }
     for name, source in negative_java.items():
         check(name, "java", java_prefix + source, False)
+    check("NoNativeCrashRecordMapAssignment", "java",
+          "import com.alibabacloud.rum.capture.nativecrash.NativeCrashInfo;\n"
+          "import com.alibabacloud.rum.event.EventContext;\n"
+          "class NoNativeCrashRecordMapAssignment { NativeCrashInfo value(EventContext c) {"
+          " return c.getNativeObject(\"recoveredRecord\", java.util.Map.class); } }", False)
     check("KotlinNoConstruct", "kotlin",
           "import com.alibabacloud.rum.event.CustomEvent\nfun create() = CustomEvent(null)", False)
     check("KotlinNullableGetter", "kotlin",
@@ -583,6 +640,10 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
     check("KotlinRecoveredRecordTypeMismatch", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\n"
           "fun value(c: EventContext): Throwable? = c.getNativeObject(\"recoveredRecord\", Map::class.java)", False)
+    check("KotlinNoNativeCrashRecordMapAssignment", "kotlin",
+          "import com.alibabacloud.rum.capture.nativecrash.NativeCrashInfo\n"
+          "import com.alibabacloud.rum.event.EventContext\n"
+          "fun value(c: EventContext): NativeCrashInfo? = c.getNativeObject(\"recoveredRecord\", Map::class.java)", False)
     check("KotlinNoContextSourceAssignment", "kotlin",
           "import com.alibabacloud.rum.event.EventContext\n"
           "fun edit(c: EventContext) { c.source = \"resource.urlconnection\" }", False)
@@ -601,7 +662,9 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
         result = subprocess.run(["javap", "-public", "-classpath", classpath,
                                  "com.alibabacloud.rum.event." + name], capture_output=True, text=True, check=True)
         (output / f"{name}.api.txt").write_text(result.stdout)
-        if "com.alibabacloud.rum.core." in result.stdout or "com.alibabacloud.rum.otel." in result.stdout:
+        if any(prefix in result.stdout for prefix in ("com.alibabacloud.rum.core.",
+                                                       "com.alibabacloud.rum.otel.",
+                                                       "com.alibabacloud.rum.capture.")):
             raise RuntimeError(f"Internal type leaked in public {name} signature")
         if f"public com.alibabacloud.rum.event.{name}(" in result.stdout:
             raise RuntimeError(f"Public constructor leaked on {name}")
