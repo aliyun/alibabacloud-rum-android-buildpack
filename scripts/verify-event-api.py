@@ -23,6 +23,8 @@ def main():
     parser.add_argument("aar", type=Path)
     parser.add_argument("--kotlin-version", default="1.9.22")
     parser.add_argument("--okhttp2", action="store_true", help="Also compile typed OkHttp 2.7.5 context consumers")
+    parser.add_argument("--okhttp3", action="store_true", help="Also compile typed OkHttp3 context consumers")
+    parser.add_argument("--okhttp3-version", default="3.12.1", help="Cached OkHttp3 version for --okhttp3")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     temporary_root = Path.home() / "tmp"
@@ -38,6 +40,8 @@ def main():
     trove = cached_jar(cache, "org.jetbrains.intellij.deps", "trove4j", "1.0.20200330")
     annotations = cached_jar(cache, "org.jetbrains", "annotations", "13.0")
     native_jars = [cached_jar(cache, "com.squareup.okhttp", "okhttp", "2.7.5")] if args.okhttp2 else []
+    if args.okhttp3:
+        native_jars.append(cached_jar(cache, "com.squareup.okhttp3", "okhttp", args.okhttp3_version))
     jars = []
     with zipfile.ZipFile(args.aar) as archive:
         for name in archive.namelist():
@@ -51,12 +55,15 @@ def main():
     compiler_classpath = os.pathsep.join(map(str, [compiler, stdlib, runtime, reflect, trove, annotations]))
     evidence = {"aar": str(args.aar.resolve()), "sha256": hashlib.sha256(args.aar.read_bytes()).hexdigest(),
                 "kotlin_version": args.kotlin_version,
+                "okhttp3_version": args.okhttp3_version if args.okhttp3 else None,
                 "application_sources": ["application.start", "application.state"],
                 "exception_sources": ["exception.manual", "exception.native", "exception.java.recovered",
                                       "exception.native.recovered", "exception.anr.recovered"],
                 "longtask_sources": ["longtask.watchdog"],
                 "replay_sources": ["view.replay"],
-                "native_context_sources": ["resource.urlconnection"] + (["resource.okhttp2"] if args.okhttp2 else []),
+                "native_context_sources": ["resource.urlconnection"]
+                + (["resource.okhttp2"] if args.okhttp2 else [])
+                + (["resource.okhttp3"] if args.okhttp3 else []),
                 "checks": []}
 
     def check(name, language, source, should_compile=True):
@@ -586,6 +593,93 @@ fun registerOkHttp2(): Boolean = AlibabaCloudRum.setEventInterceptor { event, co
     event
 }
 """)
+    if args.okhttp3:
+        check("JavaOkHttp3Consumer", "java", """
+import java.io.IOException;
+
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
+
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ResourceEvent;
+import com.alibabacloud.rum.event.ResourceSuccess;
+
+final class JavaOkHttp3Consumer {
+    boolean register() {
+        return AlibabaCloudRum.setEventInterceptor((event, context) -> {
+            if (event instanceof ResourceEvent && "resource.okhttp3".equals(context.getSource())) {
+                Request request = context.getNativeObject("request", Request.class);
+                Response response = context.getNativeObject("response", Response.class);
+                IOException error = context.getNativeObject("error", IOException.class);
+                RequestBody requestBody = request == null ? null : request.body();
+                ResponseBody responseBody = response == null ? null : response.body();
+                if (request != null && response != null && error == null
+                        && "1001".equals(response.header("X-Test-Business-Code"))) {
+                    ResourceEvent resource = (ResourceEvent) event;
+                    boolean changed = resource.setName("/orders/:id")
+                            && resource.setMessage("business declined")
+                            && resource.setSnapshots("plain replacement")
+                            && resource.setResourceResult(1001L, ResourceSuccess.FAILED);
+                    if (!changed) return event;
+                }
+            }
+            return event;
+        });
+    }
+}
+""")
+        check("KotlinOkHttp3Consumer", "kotlin", """
+import java.io.IOException
+
+import okhttp3.Request
+import okhttp3.Response
+
+import com.alibabacloud.rum.AlibabaCloudRum
+import com.alibabacloud.rum.event.ResourceEvent
+import com.alibabacloud.rum.event.ResourceSuccess
+
+fun registerOkHttp3(): Boolean = AlibabaCloudRum.setEventInterceptor { event, context ->
+    if (event is ResourceEvent && context.source == "resource.okhttp3") {
+        val request: Request? = context.getNativeObject("request", Request::class.java)
+        val response: Response? = context.getNativeObject("response", Response::class.java)
+        val error: IOException? = context.getNativeObject("error", IOException::class.java)
+        if (request != null && response != null && error == null
+                && response.header("X-Test-Business-Code") == "1001") {
+            event.setName("/orders/:id")
+            event.setMessage("business declined")
+            event.setSnapshots("plain replacement")
+            event.setResourceResult(1001L, ResourceSuccess.FAILED)
+        }
+    }
+    event
+}
+""")
+        check("JavaOkHttp3MismatchedNativeType", "java", """
+import okhttp3.Request;
+import okhttp3.Response;
+import com.alibabacloud.rum.event.EventContext;
+final class JavaOkHttp3MismatchedNativeType {
+    Request read(EventContext context) {
+        return context.getNativeObject("request", Response.class);
+    }
+}
+""", False)
+        check("KotlinOkHttp3MismatchedNativeType", "kotlin", """
+import okhttp3.Request
+import okhttp3.Response
+import com.alibabacloud.rum.event.EventContext
+fun wrongOkHttp3Type(context: EventContext): Request? =
+    context.getNativeObject("request", Response::class.java)
+""", False)
+        for suffix, native_type, slot in (("Request", "okhttp3.Request", "request"),
+                                           ("Response", "okhttp3.Response", "response"),
+                                           ("Error", "java.io.IOException", "error")):
+            check("KotlinOkHttp3Nullable" + suffix, "kotlin",
+                  "import com.alibabacloud.rum.event.EventContext\n"
+                  f"fun value(c: EventContext): {native_type} = c.getNativeObject(\"{slot}\", "
+                  f"{native_type}::class.java)", False)
     java_prefix = "import com.alibabacloud.rum.event.*;\n"
     negative_java = {
         "NoConstruct": "class NoConstruct { Object create() { return new CustomEvent(null); } }",

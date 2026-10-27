@@ -53,6 +53,11 @@ import com.alibabacloud.rum.core.event.InterceptorContext;
  * resource.okhttp2 提供 request（com.squareup.okhttp.Request）、response（成功时的
  * com.squareup.okhttp.Response）和 error（失败时已有的 IOException）三个槽；originalParameters 为空。
  * 此回调在 chain.proceed 完成后、响应或原错误交还宿主前，于当前请求线程同步执行。
+ * resource.okhttp3 提供 request（okhttp3.Request）、response（已取得时的 okhttp3.Response）和
+ * error（失败时已有的 IOException）三个可空槽；originalParameters 为空。
+ * 在 content/metrics 两阶段汇合的当前完成线程同步加工一次，通常为 EventListener.callEnd/callFailed。
+ * body 在该终点可能已经消费或关闭；SDK 不为补齐上下文提前回调、读取、复制、缓存或重放 body。
+ * 指标在用户回调前固定，原生对象不进入异步导出；这些槽不要求公共 API 依赖 OkHttp。
  * resource.urlconnection 同时适用于 HTTP/HTTPS，提供 connection（实际的 HttpURLConnection，
  * HTTPS 为 HttpsURLConnection）、inputStream（已取得的原始 InputStream）、
  * outputStream（已取得的原始 OutputStream）和 error（已有的终结 Throwable）四个可空槽；

@@ -1,6 +1,6 @@
 # Android RUM buildpack
 
-公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、View、Action、普通/手动 Exception、Java fatal / Native crash 恢复、手动 Resource、OkHttp2 与 URLConnection Resource 的统一加工接口位于
+公开入口为 `com.alibabacloud.rum.AlibabaCloudRum`。原生 Custom event/log、View、Action、普通/手动 Exception、Java fatal / Native crash 恢复、手动 Resource、OkHttp2、OkHttp3 与 URLConnection Resource 的统一加工接口位于
 `com.alibabacloud.rum.event`，用法与生命周期、候选提交、只读属性及上下文借用约束见工作区的
 [EventInterceptor 接入说明](../docs/android/event-interceptor.md) 和各公开类型的 Javadoc。
 
@@ -8,8 +8,8 @@
 
 当前支持既有 `AlibabaCloudRum.reportCustomResource(...)` 产生的手动 Resource，
 `EventContext.getSource()` 为 `resource.manual`；OkHttp2 自动来源使用 `resource.okhttp2`，
-HttpURLConnection / HttpsURLConnection 共用 `resource.urlconnection`。OkHttp3 等其它自动来源仍按各自既有流程处理，
-不能由 `ResourceEvent` 类型存在推断这些来源已支持 interceptor。
+OkHttp3 使用 `resource.okhttp3`，HttpURLConnection / HttpsURLConnection 共用 `resource.urlconnection`。
+其它来源以其接入说明为准，不能由 `ResourceEvent` 类型存在推断已支持 interceptor。
 
 ```java
 import com.alibabacloud.rum.AlibabaCloudRum;
@@ -74,6 +74,61 @@ OkHttp2 的 Resource 使用同一 `ResourceEvent` 与专用 setter。在 `chain.
 SDK 不为此读取、复制、缓存或导出 headers/body。body 可能已消费、关闭或不可安全读取；规则不得
 消费/关闭宿主流，也不得改写请求或响应。业务结果可依据安全可读的 response header 设置，
 修改或过滤 RUM 输出不会改变宿主收到的响应与错误。规则应快速完成，耗时会延长当前请求返回。
+
+## OkHttp3 原生上下文
+
+OkHttp3 的 Resource 使用同一 `ResourceEvent`，来源为 `resource.okhttp3`。SDK 将既有 content 与 metrics
+两阶段完成汇合，在最后一阶段的当前线程同步调用一次规则；通常由 `EventListener.callEnd/callFailed`
+完成网络指标。重复完成不重复加工，规则不会被转发到额外线程。身份、关联、采样与网络指标在调用前固定，
+回调耗时不计入这些网络指标，但会延长当前完成操作。不同请求可能并发进入，规则须线程安全、快速且无阻塞。
+
+| 槽 | 原生类型 | 可用条件 |
+| --- | --- | --- |
+| `request` | `okhttp3.Request` | 当前真实请求已有的 Request |
+| `response` | `okhttp3.Response` | 该请求已经取得 Response；响应前失败时可空 |
+| `error` | `java.io.IOException` | 终结时已有的原始失败异常；正常完成时为空 |
+
+`originalParameters` 为空。公共 `EventContext` 签名只依赖 JDK 类型；接入方使用自己已有的 OkHttp 依赖读取
+原生对象，无需导入内部事件模型。缺失、类型不匹配或回调结束后访问返回 `null`。
+
+```java
+import java.io.IOException;
+
+import okhttp3.Request;
+import okhttp3.Response;
+
+import com.alibabacloud.rum.AlibabaCloudRum;
+import com.alibabacloud.rum.event.ResourceEvent;
+import com.alibabacloud.rum.event.ResourceSuccess;
+
+AlibabaCloudRum.setEventInterceptor((event, context) -> {
+    if (event instanceof ResourceEvent && "resource.okhttp3".equals(context.getSource())) {
+        Request request = context.getNativeObject("request", Request.class);
+        Response response = context.getNativeObject("response", Response.class);
+        IOException error = context.getNativeObject("error", IOException.class);
+        if (request != null && response != null && error == null
+                && "1001".equals(response.header("X-Test-Business-Code"))) {
+            ResourceEvent resource = (ResourceEvent) event;
+            resource.setName("/orders/:id");
+            resource.setMessage("business declined");
+            resource.setResourceResult(1001L, ResourceSuccess.FAILED);
+        }
+    }
+    return event;
+});
+```
+
+此规则只读取原始 response header，即使 SnapshotProvider 关闭也可把 SDK 结果改为 `1001/FAILED`，
+宿主仍收到原来的 HTTP 200。修改、过滤或规则异常均保持宿主原有响应、错误、body 与完成次数。
+原生对象及其 headers/body 仅在回调期间借用，不得保留、跨线程使用、改写、消费或关闭宿主流。
+`callEnd` 时 body 可能已经消费或关闭；有 `RequestBody`/`ResponseBody` 引用不保证内容完整或可安全读取。
+SDK 不为 interceptor 提前回调、主动读取、复制、解析、缓存或重放 body，也不以 Provider 内容补齐原始数据。
+
+原始对象访问不依赖 SnapshotProvider，headers/body 不自动成为事件、日志或导出内容。
+显式开启 Provider 时，已有默认 snapshots 在规则前准备；用户成功 `setSnapshots` 后整串替换，
+不再重跑 Provider，也不被旧 snapshots 覆盖。Provider 关闭时仍可主动写入 snapshots，该字符串将随事件导出。
+注册、替换与清除在实际同步调用入口取当前值，请求开始时不会固定旧规则；较晚注册不补调已经完成的事件。
+不要在规则内调用生成业务事件的 SDK API。
 
 ## URLConnection 原生上下文
 
@@ -304,7 +359,7 @@ AlibabaCloudRum.setEventInterceptor((event, context) -> {
 ```bash
 ./gradlew :alibabacloud-android-rum-sdk:testDebugUnitTest :alibabacloud-android-rum-sdk:assembleRelease
 python3 scripts/verify-event-api.py \
-  alibabacloud-android-rum-sdk/build/outputs/aar/alibabacloud-android-rum-sdk-release.aar --okhttp2
+  alibabacloud-android-rum-sdk/build/outputs/aar/alibabacloud-android-rum-sdk-release.aar --okhttp2 --okhttp3
 ```
 
 脚本从指定 AAR 提取实际类，验证 Java/Kotlin SAM、Custom/Resource/View/Action/Exception 可空读取、64 位成对结果、boolean setter，
@@ -317,8 +372,11 @@ consumer rules 保留公开事件类型（含 ExceptionEvent）和三态枚举�
 明确失败。`--output` 可指定证据目录，`--kotlin-version` 可指定已缓存的兼容编译器版本。
 `--okhttp2` 额外使用缓存的 OkHttp 2.7.5 编译 Java/Kotlin 原生 request/response/error 读取样例，
 不改变公共 API 的基础依赖。
+`--okhttp3` 使用缓存的 OkHttp 3.12.1 编译同类的 Java/Kotlin 原生引用和 header 业务结果样例，
+以及错误原生类型赋值与 Kotlin 非空误用负例；`--okhttp3-version 4.5.0` 可复验 OkHttp 4.x 的同包 API。
+这两个开关只为消费验证增加编译 classpath，不给 buildpack 正式 API 增加可选网络依赖。
 
-消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2/URLConnection/View/Action/Exception 场景或最终导出验证。发布链必须使用本轮 SDK →
+消费检查不能代替真实宿主的 R8、Custom/手动 Resource/OkHttp2/OkHttp3/URLConnection/View/Action/Exception 场景或最终导出验证。发布链必须使用本轮 SDK →
 buildpack → 宿主产物，不以源码接缝测试或旧 AAR 代替。
 
 模块 `build.gradle` 将内嵌 SDK AAR 的 SHA-256 登记为 TransformR 输入，避免 fat-aar 1.3.8
