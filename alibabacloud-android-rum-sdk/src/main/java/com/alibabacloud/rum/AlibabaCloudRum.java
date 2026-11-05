@@ -6,10 +6,14 @@ import java.util.Map;
 import android.content.Context;
 import android.text.TextUtils;
 
+import androidx.annotation.Nullable;
+
 import com.alibabacloud.rum.capture.resource.customResource.Measuring;
 import com.alibabacloud.rum.capture.resource.customTrace.TraceContext;
 import com.alibabacloud.rum.capture.sessionreplay.privacy.SessionReplayConfiguration;
 import com.alibabacloud.rum.core.ResourceSnapshotProvider;
+import com.alibabacloud.rum.event.EventInterceptor;
+import com.alibabacloud.rum.event.EventInterceptorAdapter;
 
 /**
  * @author yulong.gyl
@@ -176,6 +180,16 @@ public class AlibabaCloudRum {
     }
 
     /**
+     * 注册、替换或清除已接入原生 Custom、Resource 与 View 加工规则，任何生命周期阶段均可调用。
+     * null 清除注册；成功返回 true，实际失败返回 false 并保留原注册。
+     * 以实际回调入口的当前注册为准，启动后设置不会补调已经处理的事件。
+     * 回调并发、候选提交与业务 API 调用限制见 {@link EventInterceptor}。
+     */
+    public static boolean setEventInterceptor(@Nullable EventInterceptor interceptor) {
+        return EventInterceptorAdapter.register(interceptor);
+    }
+
+    /**
      * Starts Session Replay recording with the default configuration.
      */
     public static void startSessionReplay() {
@@ -264,7 +278,7 @@ public class AlibabaCloudRum {
 
     public static void setCustomLog(String content, String name, String snapshots, String level,
         Map<String, Object> attributes) {
-        Agent.setCustomLog(content, name, snapshots, level, attributes);
+        Agent.setCustomLog(content, name, level, snapshots, attributes);
     }
     // endregion
 
