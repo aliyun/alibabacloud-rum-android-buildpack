@@ -154,6 +154,15 @@ public class AlibabaCloudRum {
         return SingletonHolder.INSTANCE;
     }
 
+    /**
+     * 允许当前非主进程启动 SDK，默认关闭。每个目标进程必须在调用 {@code start} 前设置。
+     * 非主进程仅支持 Java fatal、Native crash 和必要的基础能力。
+     * 启动期间或启动后设置不生效。
+     */
+    public static void setSupportMultiProcess(boolean support) {
+        Agent.setSupportMultiProcess(support);
+    }
+
     public AlibabaCloudRum start() {
         Agent.start(endpoint, appId);
         return SingletonHolder.INSTANCE;
